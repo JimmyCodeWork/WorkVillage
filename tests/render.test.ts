@@ -25,7 +25,7 @@ describe('render', () => {
 
   test('the small scene is seven rows tall', () => {
     const village = createVillage(1, 0)
-    const raster = toRasterCells(renderFrame(village, createScene(village), 120, { hour: 12 }, 'small'))
+    const raster = toRasterCells(renderFrame(village, createScene(village), 120, { hour: 12 }, SCENE_HEIGHTS.small))
     expect(raster.rows).toBe(7)
   })
 

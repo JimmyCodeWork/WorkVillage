@@ -32,6 +32,12 @@ import { isWorked, plotCenter, PLOT, type Scene } from './sim'
 export const SCENE_HEIGHTS = { small: 14, medium: 20 } as const
 export type SceneSize = keyof typeof SCENE_HEIGHTS
 
+/**
+ * Height of the small scene drawn as an image at half-cell pixels: four
+ * pixels to a terminal row, so it must be a multiple of four.
+ */
+export const FINE_SMALL_HEIGHT = 16
+
 /** The row the grass is drawn on: a thinner band of soil in a small scene. */
 const groundOf = (canvas: Canvas): number => canvas.height - (canvas.height >= 18 ? 4 : 2)
 
@@ -198,10 +204,10 @@ export function renderFrame(
   scene: Scene,
   width: number,
   time: FrameTime,
-  size: SceneSize = 'medium',
+  height: number = SCENE_HEIGHTS.medium,
 ): Canvas {
   const sky = skyFor(time.hour)
-  const canvas = createCanvas(width, SCENE_HEIGHTS[size])
+  const canvas = createCanvas(width, height)
   const GROUND = groundOf(canvas)
   const camera = Math.round(plotCenter(village.camp) - width / 2)
   const tick = scene.tick

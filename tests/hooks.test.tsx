@@ -50,3 +50,19 @@ test('/village stats speaks Traditional Chinese under a zh_TW locale', async ($,
   const out = await $.command.run({ command: 'village', args: 'stats' } as never)
   expect(out.text).toMatch(/營地/)
 })
+
+test('kitty and Ghostty draw half-size pixels as an image', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8', TERM: 'xterm-kitty' })
+  on('session.root', () => ({ value: '/work/kitty' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+
+  await $.session.start({ cwd: '/work/kitty', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
+  const image = await ui.find({ type: 'Image', key: 'village' })
+  expect(image).toBeDefined()
+  expect(await ui.find({ type: 'Raster' })).toBeUndefined()
+  await ui.unmount()
+})

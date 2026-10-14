@@ -90,7 +90,8 @@ for (const [name, signals, frames, hour] of shots) {
   const frame = renderFrame(village, scene, 160, { hour })
   writeFileSync(join(out, `${name}.png`), png(frame, 6))
   if (name === '04-village') {
-    writeFileSync(join(out, `${name}-small.png`), png(renderFrame(village, scene, 120, { hour }, 'small'), 6))
+    writeFileSync(join(out, `${name}-small.png`), png(renderFrame(village, scene, 120, { hour }, 14), 6))
+    writeFileSync(join(out, `${name}-fine.png`), png(renderFrame(village, scene, 240, { hour }, 16), 3))
   }
   console.log(name, JSON.stringify(village.resources), 'villagers', village.villagers, 'plots', village.plots.length)
 }

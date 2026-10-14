@@ -69,3 +69,15 @@ export function toSvg(canvas: Canvas, scale: number): string {
     '</svg>'
   )
 }
+
+/** RGBA bytes, base64, as an Image element's `{ rgba, width, height }` takes them. */
+export function toRgba(canvas: Canvas): { rgba: string; width: number; height: number } {
+  const bytes = new Uint8Array(canvas.width * canvas.height * 4)
+  canvas.pixels.forEach((color, i) => {
+    bytes[i * 4] = (color >> 16) & 255
+    bytes[i * 4 + 1] = (color >> 8) & 255
+    bytes[i * 4 + 2] = color & 255
+    bytes[i * 4 + 3] = 255
+  })
+  return { rgba: toBase64(bytes), width: canvas.width, height: canvas.height }
+}

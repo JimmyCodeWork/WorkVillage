@@ -13,21 +13,39 @@ import {
   type Village,
 } from '../src/core/world'
 import { resolveLocale, translator, type Translate } from '../src/i18n/index'
-import { toRasterCells, toSvg } from '../src/pixel/encode'
-import { renderFrame, SCENE_HEIGHTS, type SceneSize } from '../src/scene/render'
+import { toRasterCells, toRgba, toSvg } from '../src/pixel/encode'
+import { FINE_SMALL_HEIGHT, renderFrame, SCENE_HEIGHTS, type SceneSize } from '../src/scene/render'
 import { createScene, enqueue, isBusy, stepScene, syncScene, type Scene } from '../src/scene/sim'
 import { signalsFor } from '../src/signals'
 
 const PANE = 'workvillage'
-const RASTER_KEY = 'village'
-/** Widest band per size, in terminal columns (one pixel each). */
-const MAX_WIDTH: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
-const SVG_SCALE: Readonly<Record<SceneSize, number>> = { small: 2, medium: 3 }
+const SCENE_KEY = 'village'
+/** Widest band per size, in terminal columns. */
+const MAX_COLUMNS: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
+/** Widest vector scene, in scene pixels. */
+const MAX_VECTOR_WIDTH = 200
+
+type PixelSize = 'small' | 'medium' | 'large'
+/** CSS pixels per scene pixel on vector surfaces. */
+const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 2, large: 3 }
 
 const isHidden = atom({ plugin: 'workvillage', key: 'isHidden' } as const, false)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
 
-type Mount = { surface: string; width: number; size: SceneSize }
+/**
+ * How one site draws the scene: `raster` is half-block cells (two pixels a
+ * cell), `image` a picture at half-cell pixels where the terminal has
+ * graphics, `vector` an SVG on the remote surfaces.
+ */
+type Mount = {
+  kind: 'raster' | 'image' | 'vector'
+  /** Scene size in pixels. */
+  width: number
+  height: number
+  /** The box in terminal cells, for raster and image. */
+  columns: number
+  rows: number
+}
 
 function localHour(): number {
   const now = new Date()
@@ -47,6 +65,9 @@ function seedFrom(text: string): number {
 type Runtime = {
   animation: 'full' | 'reduced' | 'off'
   size: SceneSize
+  pixel: PixelSize
+  /** The terminal draws pictures (kitty graphics protocol). */
+  hasGraphics: boolean
   language: unknown
   t: Translate
   storeKey: string
@@ -63,6 +84,8 @@ type Runtime = {
 const rt: Runtime = {
   animation: 'full',
   size: 'small',
+  pixel: 'small',
+  hasGraphics: false,
   language: 'auto',
   t: translator('en'),
   storeKey: '',
@@ -147,8 +170,23 @@ async function apply($: EngineInterface, signals: readonly Signal[]): Promise<vo
   await update($, revision, n => n + 1)
 }
 
-function frameWidth(columns: number, size: SceneSize): number {
-  return Math.max(24, Math.min(MAX_WIDTH[size], Math.floor(columns)))
+function layout(surface: string, bodyColumns: number, size: SceneSize): Mount {
+  const columns = Math.max(24, Math.min(MAX_COLUMNS[size], Math.floor(bodyColumns)))
+  if (surface !== 'terminal') {
+    const width = Math.min(columns, MAX_VECTOR_WIDTH)
+    return { kind: 'vector', width, height: SCENE_HEIGHTS[size], columns: 0, rows: 0 }
+  }
+  if (rt.pixel === 'small' && rt.hasGraphics) {
+    // Two pixels across and four down per cell: half the size of a raster pixel.
+    const height = size === 'small' ? FINE_SMALL_HEIGHT : SCENE_HEIGHTS.medium
+    return { kind: 'image', width: columns * 2, height, columns, rows: height / 4 }
+  }
+  const height = SCENE_HEIGHTS[size]
+  return { kind: 'raster', width: columns, height, columns, rows: height / 2 }
+}
+
+function frame(mount: Mount, hour = localHour()) {
+  return renderFrame(rt.village, rt.scene, mount.width, { hour }, mount.height)
 }
 
 function tick($: EngineInterface): void {
@@ -156,25 +194,50 @@ function tick($: EngineInterface): void {
   stepScene(rt.scene, isNightHour(hour))
   let hasVector = false
   for (const [requestId, mount] of rt.mounts) {
-    if (mount.surface !== 'terminal') {
+    if (mount.kind === 'vector') {
       hasVector = true
-      continue
+    } else if (mount.kind === 'image') {
+      void blitImage($, requestId, toRgba(frame(mount, hour)))
+    } else {
+      void blitRaster($, requestId, toRasterCells(frame(mount, hour)).cells)
     }
-    const { cells } = toRasterCells(renderFrame(rt.village, rt.scene, mount.width, { hour }, mount.size))
-    void blit($, requestId, cells)
   }
   // Vector surfaces redraw the whole tree, so they move at a calmer pace.
   if (hasVector && (rt.scene.tick % 4 === 0 || isBusy(rt.scene))) $.ui.invalidate('ui.render')
 }
 
-async function blit($: EngineInterface, requestId: string, cells: string): Promise<void> {
-  const result = await $.ui.blit({ requestId, key: RASTER_KEY, cells })
+async function blitRaster($: EngineInterface, requestId: string, cells: string): Promise<void> {
+  const result = await $.ui.blit({ requestId, key: SCENE_KEY, cells })
   if (result.deny !== undefined) rt.mounts.delete(requestId)
+}
+
+async function blitImage(
+  $: EngineInterface,
+  requestId: string,
+  source: { rgba: string; width: number; height: number },
+): Promise<void> {
+  const result = await $.ui.blit({ requestId, key: SCENE_KEY, source })
+  if (result.deny !== undefined) rt.mounts.delete(requestId)
+}
+
+/** Whether this process runs in a terminal that draws Image elements. */
+async function detectGraphics($: EngineInterface): Promise<boolean> {
+  const term = (await $.env.get('TERM')) ?? ''
+  const program = ((await $.env.get('TERM_PROGRAM')) ?? '').toLowerCase()
+  if ((await $.env.get('TMUX')) !== undefined) return false
+  return (
+    term.includes('kitty') ||
+    term.includes('ghostty') ||
+    program === 'ghostty' ||
+    (await $.env.get('KITTY_WINDOW_ID')) !== undefined ||
+    (await $.env.get('GHOSTTY_RESOURCES_DIR')) !== undefined
+  )
 }
 
 async function start($: EngineInterface): Promise<void> {
   const locales = [await $.env.get('LC_ALL'), await $.env.get('LC_MESSAGES'), await $.env.get('LANG')]
   rt.t = translator(resolveLocale(rt.language, locales))
+  rt.hasGraphics = await detectGraphics($)
   const root = await $.session.root()
   rt.storeKey = `village:${root}`
   rt.village = restore(await $.store.get(rt.storeKey)) ?? createVillage(seedFrom(root), await $.clock.now())
@@ -226,6 +289,7 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
 export const register: Register = (on, options) => {
   rt.animation = options.animation === 'reduced' || options.animation === 'off' ? options.animation : 'full'
   rt.size = options.size === 'medium' ? 'medium' : 'small'
+  rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
   rt.language = options.language
 
   on('session.start', async ($, e, next) => {
@@ -260,20 +324,25 @@ export const register: Register = (on, options) => {
       return next(e)
     }
     const size = rt.size
-    const width = frameWidth(e.props.bodyColumns, size)
+    const mount = layout(e.surface, e.props.bodyColumns, size)
     // The small band is the picture alone; /village stats has the numbers.
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
-      const { Box, Text, Raster } = $.ui.resolve(e)
-      if (e.props.maxRows < SCENE_HEIGHTS[size] / 2 + (withSummary ? 2 : 1)) {
+      const { Box, Text, Raster, Image } = $.ui.resolve(e)
+      if (e.props.maxRows < mount.rows + (withSummary ? 2 : 1)) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
       }
-      rt.mounts.set(e.requestId, { surface: 'terminal', width, size })
-      const frame = toRasterCells(renderFrame(rt.village, rt.scene, width, { hour: localHour() }, size))
+      rt.mounts.set(e.requestId, mount)
+      const scene =
+        mount.kind === 'image' ? (
+          <Image key={SCENE_KEY} source={toRgba(frame(mount))} columns={mount.columns} rows={mount.rows} alt=" " />
+        ) : (
+          <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={toRasterCells(frame(mount)).cells} />
+        )
       return (
         <Box flexDirection="column">
-          <Raster key={RASTER_KEY} columns={frame.columns} rows={frame.rows} cells={frame.cells} />
+          {scene}
           {withSummary && (
             <Text dimColor wrap="truncate-end">
               {summary()}
@@ -284,12 +353,10 @@ export const register: Register = (on, options) => {
     }
     if (e.surface === 'desktop') {
       const { Box, Text, Svg } = $.ui.resolve(e)
-      const svgWidth = Math.min(width, 200)
-      rt.mounts.set(e.requestId, { surface: 'desktop', width: svgWidth, size })
-      const source = toSvg(renderFrame(rt.village, rt.scene, svgWidth, { hour: localHour() }, size), SVG_SCALE[size])
+      rt.mounts.set(e.requestId, mount)
       return (
         <Box flexDirection="column">
-          <Svg source={source} alt={rt.t('alt.village', { summary: summary() })} />
+          <Svg source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])} alt={rt.t('alt.village', { summary: summary() })} />
           {withSummary && <Text dimColor>{summary()}</Text>}
         </Box>
       )
@@ -299,15 +366,18 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     await read($, revision)
-    const width = frameWidth(e.props.bodyColumns, 'medium')
+    const mount = layout(e.surface, e.props.bodyColumns, 'medium')
+    rt.mounts.set(e.requestId, mount)
     const lines = [summary(), progressLine(), statsText()]
     if (e.surface === 'terminal') {
-      const { Box, Text, Raster } = $.ui.resolve(e)
-      rt.mounts.set(e.requestId, { surface: 'terminal', width, size: 'medium' })
-      const frame = toRasterCells(renderFrame(rt.village, rt.scene, width, { hour: localHour() }))
+      const { Box, Text, Raster, Image } = $.ui.resolve(e)
       return (
         <Box flexDirection="column">
-          <Raster key={RASTER_KEY} columns={frame.columns} rows={frame.rows} cells={frame.cells} />
+          {mount.kind === 'image' ? (
+            <Image key={SCENE_KEY} source={toRgba(frame(mount))} columns={mount.columns} rows={mount.rows} alt=" " />
+          ) : (
+            <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={toRasterCells(frame(mount)).cells} />
+          )}
           {lines.map(line => (
             <Text>{line}</Text>
           ))}
@@ -315,11 +385,9 @@ export const register: Register = (on, options) => {
       )
     }
     const { Box, Text, Svg } = $.ui.resolve(e)
-    rt.mounts.set(e.requestId, { surface: e.surface, width, size: 'medium' })
-    const source = toSvg(renderFrame(rt.village, rt.scene, Math.min(width, 200), { hour: localHour() }), SVG_SCALE.medium)
     return (
       <Box flexDirection="column">
-        <Svg source={source} alt={rt.t('alt.village', { summary: summary() })} />
+        <Svg source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])} alt={rt.t('alt.village', { summary: summary() })} />
         {lines.map(line => (
           <Text>{line}</Text>
         ))}

@@ -66,13 +66,17 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 | 設定 | 可用值 | 預設值 |
 | --- | --- | --- |
 | `size` | `small`（7 列高、最寬 120 欄）、`medium`（10 列高、全寬，並附摘要列） | `small` |
+| `pixel` | `small`、`medium`、`large`（說明如下） | `small` |
 | `language` | `auto`、`en`、`zh-TW` | `auto`（依 `LC_ALL`、`LC_MESSAGES` 或 `LANG` 判斷） |
 | `animation` | `full`、`reduced`、`off` | `full` |
 
 ## 顯示位置
 
 - **終端機**：以半格字元繪製像素場景並就地更新動畫，預設 7 列高，`medium` 尺寸為 10 列高。終端機高度不足時，改為顯示單行摘要。
-- **Claude Code 桌面版**：以 SVG 呈現相同的場景。
+- **支援圖形的終端機（kitty、Ghostty）**：`pixel` 設為 `small` 時，以圖片繪製半尺寸像素，
+  精簡尺寸僅占 4 列，且可顯示兩倍範圍的村莊。在 tmux 中則改用半格字元繪製。
+- **Claude Code 桌面版**：以 SVG 呈現相同的場景；`small`、`medium`、`large` 分別為每個像素
+  1.5、2、3 個 CSS 像素。
 - **行動版**：可於 `/village` 面板中檢視。
 
 ## 隱私

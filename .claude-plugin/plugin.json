@@ -23,6 +23,13 @@
       "default": "small",
       "options": ["small", "medium"]
     },
+    "pixel": {
+      "type": "string",
+      "title": "Pixel size",
+      "description": "How large each pixel is drawn. small uses half-size pixels in kitty and Ghostty and finer pixels on the desktop; other terminals draw two pixels per character cell at every setting.",
+      "default": "small",
+      "options": ["small", "medium", "large"]
+    },
     "animation": {
       "type": "string",
       "title": "Animation",
