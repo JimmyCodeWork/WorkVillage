@@ -20,6 +20,9 @@ export type Pose =
   | 'carryLog'
   | 'carryStone'
   | 'sit'
+  | 'read'
+  | 'ponder1'
+  | 'ponder2'
 
 /** Width of the box the villager is drawn in; the body sits in its middle. */
 export const VILLAGER_WIDTH = 9
@@ -64,13 +67,18 @@ const ARMS: Record<Pose, readonly Px[]> = {
   carryLog: [[6, 4, P.skin], [2, 0, P.woodLight], [3, 0, P.wood], [4, 0, P.wood], [5, 0, P.wood], [6, 0, P.woodDark]],
   carryStone: [[6, 5, P.skin], [6, 4, P.stoneLight], [7, 4, P.stone], [7, 5, P.stoneDark]],
   sit: [[6, 6, P.skin]],
+  // Seated with an open book on the knees.
+  read: [[5, 5, P.skin], [6, 4, P.white], [7, 4, P.white], [6, 5, P.woodDark], [7, 5, P.woodDark]],
+  // A hand at the chin, and a spark of an idea that comes and goes.
+  ponder1: [[6, 5, P.skin], [6, 4, P.skinShade], [7, 0, P.fireCore], [8, -1, P.fireCore]],
+  ponder2: [[6, 5, P.skin], [6, 4, P.skinShade], [7, 0, P.fireCore]],
 }
 
 function legsFor(pose: Pose): readonly Px[] {
   if (pose === 'walk1' || pose === 'carryLog' || pose === 'carryStone') return LEGS.walk1
   if (pose === 'walk2') return LEGS.walk2
   if (pose === 'kneel' || pose === 'water1' || pose === 'water2') return LEGS.kneel
-  if (pose === 'sit') return LEGS.sit
+  if (pose === 'sit' || pose === 'read') return LEGS.sit
   return LEGS.stand
 }
 
@@ -93,7 +101,7 @@ export function drawVillager(
     const dx = facingLeft ? VILLAGER_WIDTH - 1 - px : px
     setPixel(canvas, ox + dx, oy + py, shade(color === P.tunic ? tunic : color))
   }
-  const lower = pose === 'kneel' || pose === 'water1' || pose === 'water2' || pose === 'sit' ? 1 : 0
+  const lower = pose === 'kneel' || pose === 'water1' || pose === 'water2' || pose === 'sit' || pose === 'read' ? 1 : 0
   for (const [px, py, color] of legsFor(pose)) put(px, py, color)
   for (const [px, py, color] of TORSO(tunic)) put(px, py + lower, color)
   for (const [px, py, color] of HEAD) put(px, py + lower, color)

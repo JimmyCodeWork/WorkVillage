@@ -30,6 +30,7 @@ export const en = {
 
   'stat.edits': 'Edits',
   'stat.reads': 'Reads',
+  'stat.thoughts': 'Thoughts',
   'stat.tests': 'Passing test runs',
   'stat.commits': 'Commits',
   'stat.tasks': 'Completed tasks',

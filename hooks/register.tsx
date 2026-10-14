@@ -18,7 +18,7 @@ import { MONO_INK, type Palette } from '../src/pixel/filter'
 import { FINE_SMALL_HEIGHT, renderFrame, SCENE_HEIGHTS, type SceneSize } from '../src/scene/render'
 import { createScene, enqueue, isBusy, stepScene, syncScene, type Scene } from '../src/scene/sim'
 import { SETTINGS, settingValue, type SettingField } from '../src/settings'
-import { signalsFor } from '../src/signals'
+import { hasThinking, signalsFor } from '../src/signals'
 
 const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
@@ -148,6 +148,7 @@ function statsText(): string {
   return [
     `${t('stat.edits')} ${s.edits}`,
     `${t('stat.reads')} ${s.reads}`,
+    `${t('stat.thoughts')} ${s.thoughts}`,
     `${t('stat.tests')} ${s.tests}`,
     `${t('stat.commits')} ${s.commits}`,
     `${t('stat.tasks')} ${s.tasks}`,
@@ -380,6 +381,13 @@ export const register: Register = (on, options) => {
       await apply($, signalsFor(String(e.tool), e, ran.result))
     }
     return ran
+  }).catch(($, e, next) => next(e))
+
+  // A response the model thought through before answering grows knowledge.
+  on('session.append', async ($, e, next) => {
+    const stored = await next(e)
+    if (hasThinking(e.door, e.message.content)) await apply($, ['think'])
+    return stored
   }).catch(($, e, next) => next(e))
 
   on('turn.complete', async ($, e, next) => {

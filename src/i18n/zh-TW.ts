@@ -32,6 +32,7 @@ export const zhTW: Messages = {
 
   'stat.edits': '編輯次數',
   'stat.reads': '讀取次數',
+  'stat.thoughts': '思考次數',
   'stat.tests': '測試通過次數',
   'stat.commits': '提交次數',
   'stat.tasks': '已完成任務',

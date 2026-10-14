@@ -35,6 +35,8 @@ export function signalsFor(tool: string, input: unknown, result: unknown): Signa
   if (EDIT_TOOLS.has(tool)) return ['edit']
   if (tool === 'Write') return [record.type === 'create' ? 'create' : 'edit']
   if (READ_TOOLS.has(tool)) return ['read']
+  // Handing work to a subagent is planning, and counts as thinking.
+  if (tool === 'Agent' || tool === 'Task') return ['think']
 
   if (tool === 'Bash') {
     if (record.interrupted === true || record.backgroundTaskId !== undefined) return []
@@ -57,4 +59,15 @@ export function signalsFor(tool: string, input: unknown, result: unknown): Signa
   }
 
   return []
+}
+
+/**
+ * Whether a row the conversation keeps is a response in which the model
+ * thought before answering: an assistant row holding a thinking block.
+ */
+export function hasThinking(door: string, content: unknown): boolean {
+  if (door !== 'response' || !Array.isArray(content)) return false
+  return content.some(
+    (block: { type?: unknown }) => block?.type === 'thinking' || block?.type === 'redacted_thinking',
+  )
 }
