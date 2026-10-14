@@ -63,7 +63,7 @@ Failed tool calls never cost you anything: the village only ever grows.
 
 ## Settings
 
-Click **Settings** in the bottom-right corner of the village, or run `/village settings`, to open the
+Click **Settings** on the row under the village, or run `/village settings`, to open the
 settings panel. It can also hide or show the village above the prompt. Changes apply at once. The same settings are also in the `/config` menu,
 under **workvillage**.
 

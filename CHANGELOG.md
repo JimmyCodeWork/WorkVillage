@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The **Settings** link has a row of its own under the village instead of covering its corner; at the
+  medium size it shares that row with the summary.
+
 ## 0.2.1 - 2026-10-14
 
 - The settings button beside the village is now a plain **Settings** link in its bottom-right corner,

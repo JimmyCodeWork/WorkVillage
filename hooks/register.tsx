@@ -372,7 +372,8 @@ export const register: Register = (on, options) => {
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
       const { Box, Text, Button, Raster, Image } = $.ui.resolve(e)
-      if (e.props.maxRows < mount.rows + (withSummary ? 2 : 1)) {
+      // The scene, then one row: the summary (medium size) and the settings link.
+      if (e.props.maxRows < mount.rows + 2) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
       }
@@ -387,16 +388,19 @@ export const register: Register = (on, options) => {
         <Box flexDirection="column">
           <Box key="scene" flexShrink={0}>
             {scene}
-            {/* A plain text link in the corner, laid over the picture so it takes no room. */}
-            <Box position="absolute" right={0} bottom={0}>
-              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain onPress={() => openSettings($)} />
+          </Box>
+          <Box key="footer" flexDirection="row" justifyContent="space-between" gap={2} width={mount.columns}>
+            <Box flexShrink={1}>
+              {withSummary && (
+                <Text dimColor wrap="truncate-end">
+                  {summary()}
+                </Text>
+              )}
+            </Box>
+            <Box flexShrink={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
             </Box>
           </Box>
-          {withSummary && (
-            <Text dimColor wrap="truncate-end">
-              {summary()}
-            </Text>
-          )}
         </Box>
       )
     }
@@ -412,11 +416,13 @@ export const register: Register = (on, options) => {
               width={mount.width * VECTOR_SCALE[rt.pixel]}
               height={mount.height * VECTOR_SCALE[rt.pixel]}
             />
-            <Box position="absolute" right={0} bottom={0}>
-              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain onPress={() => openSettings($)} />
+          </Box>
+          <Box key="footer" flexDirection="row" justifyContent="space-between" gap={2}>
+            <Box flexShrink={1}>{withSummary && <Text dimColor>{summary()}</Text>}</Box>
+            <Box flexShrink={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
             </Box>
           </Box>
-          {withSummary && <Text dimColor>{summary()}</Text>}
         </Box>
       )
     }

@@ -163,5 +163,8 @@ test('the settings link never squeezes the scene', async ($, on) => {
   expect(/"columns":(\d+)/.exec(JSON.stringify(raster))?.[1]).toBe('100')
   const link = JSON.stringify(await terminal.find({ key: 'settings' }))
   expect(link).toMatch(/"plain":true/)
+  // The link has a row of its own under the picture, not over it.
+  expect(JSON.stringify(await terminal.find({ key: 'scene' }))).not.toMatch(/"key":"settings"/)
+  expect(JSON.stringify(await terminal.find({ key: 'footer' }))).toMatch(/"key":"settings"/)
   await terminal.unmount()
 })
