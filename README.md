@@ -66,13 +66,15 @@ Change these in the `/config` menu, under **workvillage**.
 
 | Setting | Values | Default |
 | --- | --- | --- |
+| `size` | `small` (7 rows, up to 120 columns), `medium` (10 rows, full width, with a summary line) | `small` |
 | `language` | `auto`, `en`, `zh-TW` | `auto` (follows `LC_ALL`, `LC_MESSAGES` or `LANG`) |
 | `animation` | `full`, `reduced`, `off` | `full` |
 
 ## Where it draws
 
-- **Terminal**: a 10-row pixel scene drawn with half-block characters, animated in place. When the
-  terminal is too short, a one-line summary is shown instead.
+- **Terminal**: a pixel scene drawn with half-block characters and animated in place: 7 rows by
+  default, or 10 rows with the `medium` size. When the terminal is too short, a one-line summary is
+  shown instead.
 - **Claude Code Desktop**: the same scene as crisp SVG.
 - **Mobile**: available in the `/village` pane.
 

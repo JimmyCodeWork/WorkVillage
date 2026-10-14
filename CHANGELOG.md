@@ -8,3 +8,4 @@
 - Seven buildings and five settlement stages; day and night follow local time.
 - Terminal (half-block raster) and desktop (SVG) rendering, plus a `/village` pane.
 - English and Traditional Chinese.
+- `size` setting: a compact 7-row band by default, or the 10-row `medium` band with a summary line.

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { applySignal, createVillage } from '../src/core/world'
 import { toBase64, toRasterCells, toSvg } from '../src/pixel/encode'
-import { renderFrame, SCENE_HEIGHT } from '../src/scene/render'
+import { renderFrame, SCENE_HEIGHTS } from '../src/scene/render'
 import { createScene, enqueue, stepScene, syncScene } from '../src/scene/sim'
 
 describe('render', () => {
@@ -17,10 +17,16 @@ describe('render', () => {
     const village = createVillage(1, 0)
     const frame = renderFrame(village, createScene(village), 80, { hour: 12 })
     expect(frame.width).toBe(80)
-    expect(frame.height).toBe(SCENE_HEIGHT)
+    expect(frame.height).toBe(SCENE_HEIGHTS.medium)
     const raster = toRasterCells(frame)
-    expect(raster.rows).toBe(SCENE_HEIGHT / 2)
+    expect(raster.rows).toBe(SCENE_HEIGHTS.medium / 2)
     expect(raster.cells.length).toBe(Math.ceil((80 * 10 * 12) / 3) * 4)
+  })
+
+  test('the small scene is seven rows tall', () => {
+    const village = createVillage(1, 0)
+    const raster = toRasterCells(renderFrame(village, createScene(village), 120, { hour: 12 }, 'small'))
+    expect(raster.rows).toBe(7)
   })
 
   test('svg stays within the size a surface accepts', () => {

@@ -25,11 +25,13 @@ test('the band draws the village and follows the work', async ($, on) => {
   await $.session.start({ cwd: '/work/project', surface: 'terminal', isInteractive: true })
   const ui = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
   expect(await ui.find({ key: 'village' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /Camp/ })).toBeDefined()
+  // The default small band is the picture alone.
+  expect(await ui.find({ type: 'Text' })).toBeUndefined()
+  await ui.unmount()
 
   await $.tool.call({ tool: 'Edit', file_path: '/x', old_string: 'a', new_string: 'b' } as never)
-  expect(await ui.find({ type: 'Text', text: /Timber [1-9]|Stone [1-9]/ })).toBeDefined()
-  await ui.unmount()
+  const stats = await $.command.run({ command: 'village', args: 'stats' } as never)
+  expect(stats.text).toMatch(/Timber [1-9]|Stone [1-9]/)
 
   const desktop = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
   expect(await desktop.find({ type: 'Svg' })).toBeDefined()

@@ -16,6 +16,13 @@
       "default": "auto",
       "options": ["auto", "en", "zh-TW"]
     },
+    "size": {
+      "type": "string",
+      "title": "Size",
+      "description": "small is a 7-row picture up to 120 columns wide; medium is 10 rows, full width, with a summary line.",
+      "default": "small",
+      "options": ["small", "medium"]
+    },
     "animation": {
       "type": "string",
       "title": "Animation",

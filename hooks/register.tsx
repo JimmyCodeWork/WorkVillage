@@ -14,20 +14,20 @@ import {
 } from '../src/core/world'
 import { resolveLocale, translator, type Translate } from '../src/i18n/index'
 import { toRasterCells, toSvg } from '../src/pixel/encode'
-import { renderFrame, SCENE_HEIGHT } from '../src/scene/render'
+import { renderFrame, SCENE_HEIGHTS, type SceneSize } from '../src/scene/render'
 import { createScene, enqueue, isBusy, stepScene, syncScene, type Scene } from '../src/scene/sim'
 import { signalsFor } from '../src/signals'
 
 const PANE = 'workvillage'
 const RASTER_KEY = 'village'
-const RASTER_ROWS = SCENE_HEIGHT / 2
-const MAX_WIDTH = 240
-const SVG_SCALE = 3
+/** Widest band per size, in terminal columns (one pixel each). */
+const MAX_WIDTH: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
+const SVG_SCALE: Readonly<Record<SceneSize, number>> = { small: 2, medium: 3 }
 
 const isHidden = atom({ plugin: 'workvillage', key: 'isHidden' } as const, false)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
 
-type Mount = { surface: string; width: number }
+type Mount = { surface: string; width: number; size: SceneSize }
 
 function localHour(): number {
   const now = new Date()
@@ -46,6 +46,7 @@ function seedFrom(text: string): number {
 
 type Runtime = {
   animation: 'full' | 'reduced' | 'off'
+  size: SceneSize
   language: unknown
   t: Translate
   storeKey: string
@@ -61,6 +62,7 @@ type Runtime = {
 // hot reload loses nothing that matters.
 const rt: Runtime = {
   animation: 'full',
+  size: 'small',
   language: 'auto',
   t: translator('en'),
   storeKey: '',
@@ -145,8 +147,8 @@ async function apply($: EngineInterface, signals: readonly Signal[]): Promise<vo
   await update($, revision, n => n + 1)
 }
 
-function frameWidth(columns: number): number {
-  return Math.max(24, Math.min(MAX_WIDTH, Math.floor(columns)))
+function frameWidth(columns: number, size: SceneSize): number {
+  return Math.max(24, Math.min(MAX_WIDTH[size], Math.floor(columns)))
 }
 
 function tick($: EngineInterface): void {
@@ -158,7 +160,7 @@ function tick($: EngineInterface): void {
       hasVector = true
       continue
     }
-    const { cells } = toRasterCells(renderFrame(rt.village, rt.scene, mount.width, { hour }))
+    const { cells } = toRasterCells(renderFrame(rt.village, rt.scene, mount.width, { hour }, mount.size))
     void blit($, requestId, cells)
   }
   // Vector surfaces redraw the whole tree, so they move at a calmer pace.
@@ -223,6 +225,7 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
 
 export const register: Register = (on, options) => {
   rt.animation = options.animation === 'reduced' || options.animation === 'off' ? options.animation : 'full'
+  rt.size = options.size === 'medium' ? 'medium' : 'small'
   rt.language = options.language
 
   on('session.start', async ($, e, next) => {
@@ -256,33 +259,38 @@ export const register: Register = (on, options) => {
       rt.mounts.delete(e.requestId)
       return next(e)
     }
-    const width = frameWidth(e.props.bodyColumns)
+    const size = rt.size
+    const width = frameWidth(e.props.bodyColumns, size)
+    // The small band is the picture alone; /village stats has the numbers.
+    const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
       const { Box, Text, Raster } = $.ui.resolve(e)
-      if (e.props.maxRows < RASTER_ROWS + 2) {
+      if (e.props.maxRows < SCENE_HEIGHTS[size] / 2 + (withSummary ? 2 : 1)) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
       }
-      rt.mounts.set(e.requestId, { surface: 'terminal', width })
-      const frame = toRasterCells(renderFrame(rt.village, rt.scene, width, { hour: localHour() }))
+      rt.mounts.set(e.requestId, { surface: 'terminal', width, size })
+      const frame = toRasterCells(renderFrame(rt.village, rt.scene, width, { hour: localHour() }, size))
       return (
         <Box flexDirection="column">
           <Raster key={RASTER_KEY} columns={frame.columns} rows={frame.rows} cells={frame.cells} />
-          <Text dimColor wrap="truncate-end">
-            {summary()}
-          </Text>
+          {withSummary && (
+            <Text dimColor wrap="truncate-end">
+              {summary()}
+            </Text>
+          )}
         </Box>
       )
     }
     if (e.surface === 'desktop') {
       const { Box, Text, Svg } = $.ui.resolve(e)
-      rt.mounts.set(e.requestId, { surface: 'desktop', width })
       const svgWidth = Math.min(width, 200)
-      const source = toSvg(renderFrame(rt.village, rt.scene, svgWidth, { hour: localHour() }), SVG_SCALE)
+      rt.mounts.set(e.requestId, { surface: 'desktop', width: svgWidth, size })
+      const source = toSvg(renderFrame(rt.village, rt.scene, svgWidth, { hour: localHour() }, size), SVG_SCALE[size])
       return (
         <Box flexDirection="column">
           <Svg source={source} alt={rt.t('alt.village', { summary: summary() })} />
-          <Text dimColor>{summary()}</Text>
+          {withSummary && <Text dimColor>{summary()}</Text>}
         </Box>
       )
     }
@@ -291,11 +299,11 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     await read($, revision)
-    const width = frameWidth(e.props.bodyColumns)
+    const width = frameWidth(e.props.bodyColumns, 'medium')
     const lines = [summary(), progressLine(), statsText()]
     if (e.surface === 'terminal') {
       const { Box, Text, Raster } = $.ui.resolve(e)
-      rt.mounts.set(e.requestId, { surface: 'terminal', width })
+      rt.mounts.set(e.requestId, { surface: 'terminal', width, size: 'medium' })
       const frame = toRasterCells(renderFrame(rt.village, rt.scene, width, { hour: localHour() }))
       return (
         <Box flexDirection="column">
@@ -307,8 +315,8 @@ export const register: Register = (on, options) => {
       )
     }
     const { Box, Text, Svg } = $.ui.resolve(e)
-    rt.mounts.set(e.requestId, { surface: e.surface, width })
-    const source = toSvg(renderFrame(rt.village, rt.scene, Math.min(width, 200), { hour: localHour() }), SVG_SCALE)
+    rt.mounts.set(e.requestId, { surface: e.surface, width, size: 'medium' })
+    const source = toSvg(renderFrame(rt.village, rt.scene, Math.min(width, 200), { hour: localHour() }), SVG_SCALE.medium)
     return (
       <Box flexDirection="column">
         <Svg source={source} alt={rt.t('alt.village', { summary: summary() })} />

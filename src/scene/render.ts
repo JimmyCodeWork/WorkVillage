@@ -2,7 +2,6 @@
 
 import { P, skyFor, type Sky } from '../art/palette'
 import {
-
   CAMPFIRE,
   CLOUD,
   CROPS,
@@ -29,8 +28,12 @@ import { hash01, wildPlot, type Plot, type Village } from '../core/world'
 import { createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
 import { isWorked, plotCenter, PLOT, type Scene } from './sim'
 
-export const SCENE_HEIGHT = 20
-const GROUND = SCENE_HEIGHT - 4
+/** Scene heights in pixels; a terminal row holds two. */
+export const SCENE_HEIGHTS = { small: 14, medium: 20 } as const
+export type SceneSize = keyof typeof SCENE_HEIGHTS
+
+/** The row the grass is drawn on: a thinner band of soil in a small scene. */
+const groundOf = (canvas: Canvas): number => canvas.height - (canvas.height >= 18 ? 4 : 2)
 
 const BUILDING_ART: Readonly<Record<BuildingKind, Sprite>> = {
   tent: TENT,
@@ -48,6 +51,7 @@ export type FrameTime = {
 }
 
 function drawSky(canvas: Canvas, sky: Sky, tick: number, seed: number, camera: number): void {
+  const GROUND = groundOf(canvas)
   for (let y = 0; y < GROUND; y++) {
     const color = mix(sky.top, sky.bottom, y / (GROUND - 1))
     fillRect(canvas, 0, y, canvas.width, 1, color)
@@ -74,6 +78,7 @@ function drawSky(canvas: Canvas, sky: Sky, tick: number, seed: number, camera: n
 }
 
 function drawHills(canvas: Canvas, sky: Sky, camera: number): void {
+  const GROUND = groundOf(canvas)
   for (let x = 0; x < canvas.width; x++) {
     const far = (x + camera / 4) / 9
     const near = (x + camera / 2) / 6
@@ -85,8 +90,9 @@ function drawHills(canvas: Canvas, sky: Sky, camera: number): void {
 }
 
 function drawGround(canvas: Canvas, sky: Sky, seed: number, camera: number): void {
+  const GROUND = groundOf(canvas)
   fillRect(canvas, 0, GROUND, canvas.width, 1, sky.grass)
-  fillRect(canvas, 0, GROUND + 1, canvas.width, SCENE_HEIGHT - GROUND - 1, sky.dirt)
+  fillRect(canvas, 0, GROUND + 1, canvas.width, canvas.height - GROUND - 1, sky.dirt)
   for (let x = 0; x < canvas.width; x++) {
     const wx = x + camera
     if (hash01(seed + 3, wx) < 0.3) setPixel(canvas, x, GROUND, sky.grassLight)
@@ -94,7 +100,7 @@ function drawGround(canvas: Canvas, sky: Sky, seed: number, camera: number): voi
   }
 }
 
-const bottomY = (sprite: Sprite): number => GROUND + 1 - sprite.height
+const bottomY = (canvas: Canvas, sprite: Sprite): number => groundOf(canvas) + 1 - sprite.height
 
 function drawPlot(
   canvas: Canvas,
@@ -105,20 +111,21 @@ function drawPlot(
   shake: number,
   tick: number,
 ): void {
+  const GROUND = groundOf(canvas)
   const centered = (sprite: Sprite): number => x0 + Math.floor((PLOT - sprite.width) / 2)
   switch (plot.kind) {
     case 'tree': {
       const art = TREES[plot.variant % TREES.length]!
-      drawSprite(canvas, art, centered(art) + shake, bottomY(art))
+      drawSprite(canvas, art, centered(art) + shake, bottomY(canvas, art))
       break
     }
     case 'rock': {
       const art = ROCKS[plot.variant % ROCKS.length]!
-      drawSprite(canvas, art, centered(art), bottomY(art))
+      drawSprite(canvas, art, centered(art), bottomY(canvas, art))
       break
     }
     case 'stump':
-      drawSprite(canvas, STUMP, centered(STUMP), bottomY(STUMP))
+      drawSprite(canvas, STUMP, centered(STUMP), bottomY(canvas, STUMP))
       break
     case 'grass':
       if (hash01(seed + 9, index) < 0.6) drawSprite(canvas, TUFT, x0 + 2 + Math.floor(hash01(seed, index) * 6), GROUND - 1)
@@ -132,7 +139,7 @@ function drawPlot(
     }
     case 'camp': {
       const fire = CAMPFIRE[Math.floor(tick / 2) % CAMPFIRE.length]!
-      drawSprite(canvas, fire, centered(fire), bottomY(fire))
+      drawSprite(canvas, fire, centered(fire), bottomY(canvas, fire))
       break
     }
     case 'building': {
@@ -140,7 +147,7 @@ function drawPlot(
       const total = BUILDINGS[plot.building].steps
       const done = plot.progress >= total
       const x = centered(art)
-      const y = bottomY(art)
+      const y = bottomY(canvas, art)
       if (done) {
         drawSprite(canvas, art, x, y)
       } else {
@@ -159,6 +166,7 @@ function drawPlot(
 }
 
 function drawStockpile(canvas: Canvas, village: Village, x: number): void {
+  const GROUND = groundOf(canvas)
   // A small woodpile right of the fire; it grows with the wood in store.
   const logs = Math.min(3, Math.ceil(village.resources.wood / 6))
   for (let i = 0; i < logs; i++) drawSprite(canvas, LOG, x, GROUND - 1 - i * 2)
@@ -166,6 +174,7 @@ function drawStockpile(canvas: Canvas, village: Village, x: number): void {
 
 function nightShade(canvas: Canvas, background: Int32Array, sky: Sky, fireX: number): void {
   if (sky.dim <= 0) return
+  const GROUND = groundOf(canvas)
   const night = 0x0d1328
   for (let y = 0; y < canvas.height; y++) {
     for (let x = 0; x < canvas.width; x++) {
@@ -184,9 +193,16 @@ function nightShade(canvas: Canvas, background: Int32Array, sky: Sky, fireX: num
  * Draws a frame `width` pixels wide centred on the camp. Plots outside the
  * village are drawn as the wilderness that will be cleared there later.
  */
-export function renderFrame(village: Village, scene: Scene, width: number, time: FrameTime): Canvas {
+export function renderFrame(
+  village: Village,
+  scene: Scene,
+  width: number,
+  time: FrameTime,
+  size: SceneSize = 'medium',
+): Canvas {
   const sky = skyFor(time.hour)
-  const canvas = createCanvas(width, SCENE_HEIGHT)
+  const canvas = createCanvas(width, SCENE_HEIGHTS[size])
+  const GROUND = groundOf(canvas)
   const camera = Math.round(plotCenter(village.camp) - width / 2)
   const tick = scene.tick
 
@@ -206,7 +222,7 @@ export function renderFrame(village: Village, scene: Scene, width: number, time:
     drawPlot(canvas, plot, x0, village.seed, index, shake, tick)
     if (plot.kind === 'building' && plot.progress >= BUILDINGS[plot.building].steps) {
       const art = BUILDING_ART[plot.building]
-      lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(art) })
+      lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art) })
     }
   }
 
@@ -222,8 +238,8 @@ export function renderFrame(village: Village, scene: Scene, width: number, time:
   if (sky.dim > 0) {
     // Fires and windows keep their light after dark.
     const fire = sky.stars ? CAMPFIRE[Math.floor(tick / 2) % CAMPFIRE.length]! : EMBERS
-    if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(fire), { only: P.fire })
-    if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(fire), { only: P.fireCore })
+    if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(canvas, fire), { only: P.fire })
+    if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(canvas, fire), { only: P.fireCore })
     for (const { sprite, x, y } of lit) drawSprite(canvas, sprite, x, y, { only: P.window })
   }
   return canvas
