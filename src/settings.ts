@@ -9,7 +9,7 @@ export const SETTINGS: readonly Setting[] = [
   { field: 'palette', options: ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark'], fallback: 'color' },
   { field: 'size', options: ['small', 'medium'], fallback: 'small' },
   { field: 'pixel', options: ['small', 'medium', 'large'], fallback: 'small' },
-  { field: 'link', options: ['top', 'bottom', 'hidden'], fallback: 'top' },
+  { field: 'link', options: ['hint', 'top', 'bottom', 'hidden'], fallback: 'hint' },
   { field: 'language', options: ['auto', 'en', 'zh-TW'], fallback: 'auto' },
   { field: 'animation', options: ['full', 'reduced', 'off'], fallback: 'full' },
 ]

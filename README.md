@@ -63,7 +63,8 @@ Failed tool calls never cost you anything: the village only ever grows.
 
 ## Settings
 
-Click **Settings** on the row above the village (its place is the `link` setting), or run `/village settings`, to open the
+Click **WorkVillage Settings** at the end of the hint line under the prompt (the `link` setting can move
+it above or below the village instead), or run `/village settings`, to open the
 settings panel. It can also hide or show the village above the prompt. Changes apply at once. The same settings are also in the `/config` menu,
 under **workvillage**.
 
@@ -72,7 +73,7 @@ under **workvillage**.
 | `size` | `small` (7 rows, up to 120 columns), `medium` (10 rows, full width, with a summary line) | `small` |
 | `palette` | `color`, `grayscale`, `mono`, `mono-light`, `mono-dark` | `color` |
 | `pixel` | `small`, `medium`, `large` (see below) | `small` |
-| `link` | `top`, `bottom`, `hidden` (where the Settings link sits) | `top` |
+| `link` | `hint`, `top`, `bottom`, `hidden` (where the Settings link sits) | `hint` |
 | `language` | `auto`, `en`, `zh-TW` | `auto` (follows `LC_ALL`, `LC_MESSAGES` or `LANG`) |
 | `animation` | `full`, `reduced`, `off` | `full` |
 

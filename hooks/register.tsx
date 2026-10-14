@@ -35,7 +35,7 @@ const PALETTES: readonly Palette[] = ['color', 'grayscale', 'mono', 'mono-light'
 
 type PixelSize = 'small' | 'medium' | 'large'
 /** Where the row holding the settings link sits, if anywhere. */
-type LinkPosition = 'top' | 'bottom' | 'hidden'
+type LinkPosition = 'hint' | 'top' | 'bottom' | 'hidden'
 /** CSS pixels per scene pixel on vector surfaces. */
 const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 2, large: 3 }
 
@@ -99,7 +99,7 @@ const rt: Runtime = {
   animation: 'full',
   size: 'small',
   pixel: 'small',
-  linkPosition: 'top',
+  linkPosition: 'hint',
   palette: 'color',
   hasGraphics: false,
   language: 'auto',
@@ -336,7 +336,7 @@ export const register: Register = (on, options) => {
   rt.size = options.size === 'medium' ? 'medium' : 'small'
   rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
   rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
-  rt.linkPosition = options.link === 'bottom' || options.link === 'hidden' ? options.link : 'top'
+  rt.linkPosition = options.link === 'top' || options.link === 'bottom' || options.link === 'hidden' ? options.link : 'hint'
   rt.language = options.language
   rt.options = options
 
@@ -377,7 +377,7 @@ export const register: Register = (on, options) => {
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
       const { Box, Text, Button, Raster, Image } = $.ui.resolve(e)
-      const hasLink = rt.linkPosition !== 'hidden'
+      const hasLink = rt.linkPosition === 'top' || rt.linkPosition === 'bottom'
       if (e.props.maxRows < mount.rows + (withSummary ? 1 : 0) + (hasLink ? 1 : 0) + 1) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
@@ -413,7 +413,7 @@ export const register: Register = (on, options) => {
     if (e.surface === 'desktop') {
       const { Box, Text, Button, Svg } = $.ui.resolve(e)
       rt.mounts.set(e.requestId, mount)
-      const link = rt.linkPosition !== 'hidden' && (
+      const link = (rt.linkPosition === 'top' || rt.linkPosition === 'bottom') && (
         <Box key="link" flexDirection="row" justifyContent="flex-end">
           <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
         </Box>
@@ -435,6 +435,22 @@ export const register: Register = (on, options) => {
       )
     }
     return next(e)
+  }).catch(($, e, next) => next(e))
+
+  // By default the settings link lives on the hint line under the prompt, a
+  // block of its own, so the village above the prompt keeps its layout.
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    if (!rt.isReady || rt.linkPosition !== 'hint' || e.props.isDraft || e.props.isWorking) return next(e)
+    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="row" gap={2}>
+        <Text dimColor wrap="truncate-end">
+          {e.props.hint}
+        </Text>
+        <Button key={SETTINGS_KEY} label={`WorkVillage ${rt.t('settings.open')}`} plain dimColor onPress={() => openSettings($)} />
+      </Box>
+    )
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
