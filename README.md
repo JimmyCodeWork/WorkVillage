@@ -58,11 +58,14 @@ Failed tool calls never cost you anything: the village only ever grows.
 | `/village` | Open the village pane with resources and activity |
 | `/village show` / `/village hide` | Show or hide the band above the prompt |
 | `/village stats` | Print the village's resources and your activity |
+| `/village settings` | Open the settings panel |
 | `/village reset confirm` | Return this project's village to wilderness |
 
 ## Settings
 
-Change these in the `/config` menu, under **workvillage**.
+Press the **≡** button beside the village (**Settings** on the desktop), or run `/village settings`,
+to open the settings panel. Changes apply at once. The same settings are also in the `/config` menu,
+under **workvillage**.
 
 | Setting | Values | Default |
 | --- | --- | --- |

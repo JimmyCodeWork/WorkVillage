@@ -17,9 +17,14 @@ import { toRasterCells, toRgba, toSvg } from '../src/pixel/encode'
 import { MONO_INK, type Palette } from '../src/pixel/filter'
 import { FINE_SMALL_HEIGHT, renderFrame, SCENE_HEIGHTS, type SceneSize } from '../src/scene/render'
 import { createScene, enqueue, isBusy, stepScene, syncScene, type Scene } from '../src/scene/sim'
+import { SETTINGS, settingValue, type SettingField } from '../src/settings'
 import { signalsFor } from '../src/signals'
 
 const PANE = 'workvillage'
+const SETTINGS_PANE = 'workvillage-settings'
+const SETTINGS_KEY = 'settings'
+/** Columns the settings button takes beside the scene, its gap included. */
+const BUTTON_COLUMNS = 2
 const SCENE_KEY = 'village'
 /** Widest band per size, in terminal columns. */
 const MAX_COLUMNS: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
@@ -81,6 +86,8 @@ type Runtime = {
   ticker?: { cancel: () => void }
   saveTimer?: { cancel: () => void }
   mounts: Map<string, Mount>
+  /** The userConfig values as loaded, for the settings panel. */
+  options: Readonly<Record<string, unknown>>
 }
 
 // The module's own state: rebuilt from $.store at each session.start, so a
@@ -98,6 +105,7 @@ const rt: Runtime = {
   scene: createScene(createVillage(0, 0)),
   isReady: false,
   mounts: new Map(),
+  options: {},
 }
 
 function summary(): string {
@@ -255,7 +263,7 @@ async function start($: EngineInterface): Promise<void> {
   await $.command.register({
     name: 'village',
     description: rt.t('command.description'),
-    argumentHint: '[show | hide | stats | reset]',
+    argumentHint: '[show | hide | stats | settings | reset]',
   })
   rt.ticker?.cancel()
   rt.ticker = rt.animation === 'off' ? undefined : $.clock.every(rt.animation === 'reduced' ? 1000 : 125, () => tick($))
@@ -265,6 +273,21 @@ async function stop($: EngineInterface): Promise<void> {
   rt.ticker?.cancel()
   rt.saveTimer?.cancel()
   if (rt.isReady) await $.store.set(rt.storeKey, rt.village)
+}
+
+async function openSettings($: EngineInterface): Promise<void> {
+  await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
+}
+
+/**
+ * Writes one of the plugin's userConfig fields as the /config menu would;
+ * the engine then reloads the module with the new options.
+ */
+async function changeSetting($: EngineInterface, field: SettingField, value: string): Promise<void> {
+  const rows = await $.config.list()
+  const key = rows.find(row => row.key.endsWith(`.${field}`) && row.key.split('.')[0]?.startsWith('workvillage'))?.key
+  const result = await $.config.set({ key: key ?? `workvillage.${field}`, value })
+  if (result.deny !== undefined) $.ui.toast(rt.t('settings.denied', { reason: result.deny }))
 }
 
 async function runCommand($: EngineInterface, args: string): Promise<{ text: string }> {
@@ -281,6 +304,9 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
     case 'hide':
       await update($, isHidden, () => true)
       return { text: t('command.hidden') }
+    case 'settings':
+      await openSettings($)
+      return { text: t('command.settings') }
     case 'stats':
       return { text: `${summary()}\n${progressLine()}\n${statsText()}` }
     case 'reset':
@@ -301,6 +327,7 @@ export const register: Register = (on, options) => {
   rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
   rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
   rt.language = options.language
+  rt.options = options
 
   on('session.start', async ($, e, next) => {
     await start($)
@@ -334,11 +361,11 @@ export const register: Register = (on, options) => {
       return next(e)
     }
     const size = rt.size
-    const mount = layout(e.surface, e.props.bodyColumns, size)
+    const mount = layout(e.surface, e.props.bodyColumns - BUTTON_COLUMNS, size)
     // The small band is the picture alone; /village stats has the numbers.
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
-      const { Box, Text, Raster, Image } = $.ui.resolve(e)
+      const { Box, Text, Button, Raster, Image } = $.ui.resolve(e)
       if (e.props.maxRows < mount.rows + (withSummary ? 2 : 1)) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
@@ -352,7 +379,10 @@ export const register: Register = (on, options) => {
         )
       return (
         <Box flexDirection="column">
-          {scene}
+          <Box flexDirection="row" gap={1}>
+            {scene}
+            <Button key={SETTINGS_KEY} label="≡" plain onPress={() => openSettings($)} />
+          </Box>
           {withSummary && (
             <Text dimColor wrap="truncate-end">
               {summary()}
@@ -362,11 +392,14 @@ export const register: Register = (on, options) => {
       )
     }
     if (e.surface === 'desktop') {
-      const { Box, Text, Svg } = $.ui.resolve(e)
+      const { Box, Text, Button, Svg } = $.ui.resolve(e)
       rt.mounts.set(e.requestId, mount)
       return (
         <Box flexDirection="column">
-          <Svg source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])} alt={rt.t('alt.village', { summary: summary() })} />
+          <Box flexDirection="row" gap={1}>
+            <Svg source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])} alt={rt.t('alt.village', { summary: summary() })} />
+            <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+          </Box>
           {withSummary && <Text dimColor>{summary()}</Text>}
         </Box>
       )
@@ -400,6 +433,51 @@ export const register: Register = (on, options) => {
         <Svg source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])} alt={rt.t('alt.village', { summary: summary() })} />
         {lines.map(line => (
           <Text>{line}</Text>
+        ))}
+      </Box>
+    )
+  })
+
+  on('ui.render', { component: 'Pane', requestId: SETTINGS_PANE }, async ($, e) => {
+    const { t } = rt
+    const label = (field: SettingField, value: string) => t(`option.${field}.${value}` as Parameters<Translate>[0])
+    if (e.surface === 'mobile') {
+      // No Select on mobile: one Button per choice, the current one marked.
+      const { Box, Text, Button } = $.ui.resolve(e)
+      return (
+        <Box flexDirection="column">
+          <Text dimColor>{t('settings.hint')}</Text>
+          {SETTINGS.map(setting => {
+            const current = settingValue(setting, rt.options[setting.field])
+            return (
+              <Box flexDirection="column">
+                <Text bold>{t(`setting.${setting.field}`)}</Text>
+                {setting.options.map(value => (
+                  <Button
+                    key={`${setting.field}:${value}`}
+                    label={label(setting.field, value)}
+                    variant={value === current ? 'primary' : 'secondary'}
+                    onPress={() => changeSetting($, setting.field, value)}
+                  />
+                ))}
+              </Box>
+            )
+          })}
+        </Box>
+      )
+    }
+    const { Box, Text, Select } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="column">
+        <Text dimColor>{t('settings.hint')}</Text>
+        {SETTINGS.map(setting => (
+          <Select
+            key={setting.field}
+            label={t(`setting.${setting.field}`)}
+            value={settingValue(setting, rt.options[setting.field])}
+            options={setting.options.map(value => ({ value, label: label(setting.field, value) }))}
+            onSelect={value => changeSetting($, setting.field, value)}
+          />
         ))}
       </Box>
     )

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- A settings button beside the village, and `/village settings`, open a panel for colours, size,
+  pixel size, language and animation; changes apply at once.
+
 ## 0.1.0 - 2026-10-14
 
 - First release: a pixel-art village above the prompt that grows from wilderness as you work.
