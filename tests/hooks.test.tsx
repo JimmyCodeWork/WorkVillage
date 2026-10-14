@@ -151,21 +151,21 @@ test('the settings link never squeezes the scene', async ($, on) => {
 
   await $.session.start({ cwd: '/work/layout', surface: 'desktop', isInteractive: true })
   const desktop = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
-  const scene = JSON.stringify(await desktop.find({ key: 'scene' }))
+  const scene = JSON.stringify(await desktop.find({ key: 'village' }))
   expect(scene).toMatch(/"flexShrink":0/)
   const width = Number(/"width":(\d+(?:\.\d+)?)/.exec(JSON.stringify(await desktop.find({ type: 'Svg' })))?.[1])
   expect(width).toBeGreaterThanOrEqual(450)
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
-  expect(JSON.stringify(await terminal.find({ key: 'scene' }))).toMatch(/"flexShrink":0/)
+  expect(JSON.stringify(await terminal.find({ key: 'village' }))).toMatch(/"flexShrink":0/)
   const raster = await terminal.find({ type: 'Raster' })
   expect(/"columns":(\d+)/.exec(JSON.stringify(raster))?.[1]).toBe('100')
   const link = JSON.stringify(await terminal.find({ key: 'settings' }))
   expect(link).toMatch(/"plain":true/)
-  // The link has a row of its own, not over the picture.
-  expect(JSON.stringify(await terminal.find({ key: 'scene' }))).not.toMatch(/"key":"settings"/)
-  expect(JSON.stringify(await terminal.find({ key: 'info' }))).toMatch(/"key":"settings"/)
+  // The link has a row of its own, apart from the village block.
+  expect(JSON.stringify(await terminal.find({ key: 'village' }))).not.toMatch(/"key":"settings"/)
+  expect(JSON.stringify(await terminal.find({ key: 'link' }))).toMatch(/"key":"settings"/)
   await terminal.unmount()
 })
 
@@ -189,8 +189,8 @@ for (const [link, order] of [
       if (order === 'no link') {
         expect(await ui.find({ key: 'settings' })).toBeUndefined()
       } else {
-        const info = tree.indexOf('"key":"info"')
-        const scene = tree.indexOf('"key":"scene"')
+        const info = tree.indexOf('"key":"link"')
+        const scene = tree.indexOf('"key":"village"')
         expect(info).toBeGreaterThan(-1)
         expect(order === 'info first' ? info < scene : info > scene).toBe(true)
       }
@@ -198,3 +198,21 @@ for (const [link, order] of [
     }
   })
 }
+
+test('the settings link never joins the village block, at any size', { options: { size: 'medium' } }, async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/block' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+
+  await $.session.start({ cwd: '/work/block', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
+  const village = JSON.stringify(await ui.find({ key: 'village' }))
+  // The summary stays under the picture, as before the link existed.
+  expect(village).toMatch(/Camp/)
+  expect(village).not.toMatch(/"key":"settings"/)
+  expect(JSON.stringify(await ui.find({ key: 'link' }))).not.toMatch(/Camp/)
+  await ui.unmount()
+})

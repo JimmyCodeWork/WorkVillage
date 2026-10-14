@@ -378,8 +378,7 @@ export const register: Register = (on, options) => {
     if (e.surface === 'terminal') {
       const { Box, Text, Button, Raster, Image } = $.ui.resolve(e)
       const hasLink = rt.linkPosition !== 'hidden'
-      const hasRow = hasLink || withSummary
-      if (e.props.maxRows < mount.rows + (hasRow ? 2 : 1)) {
+      if (e.props.maxRows < mount.rows + (withSummary ? 1 : 0) + (hasLink ? 1 : 0) + 1) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
       }
@@ -390,61 +389,48 @@ export const register: Register = (on, options) => {
         ) : (
           <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={rasterCells(frame(mount))} />
         )
-      // One row beside the picture: the summary (medium size) and the settings link.
-      const info = hasRow && (
-        <Box key="info" flexDirection="row" justifyContent="space-between" gap={2} width={mount.columns}>
-          <Box flexShrink={1}>
+      // The settings link is a row of its own, apart from the village block.
+      const link = hasLink && (
+        <Box key="link" flexDirection="row" justifyContent="flex-end" width={mount.columns}>
+          <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
+        </Box>
+      )
+      return (
+        <Box flexDirection="column">
+          {rt.linkPosition === 'top' && link}
+          <Box key="village" flexDirection="column" flexShrink={0}>
+            {scene}
             {withSummary && (
               <Text dimColor wrap="truncate-end">
                 {summary()}
               </Text>
             )}
           </Box>
-          {hasLink && (
-            <Box flexShrink={0}>
-              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
-            </Box>
-          )}
-        </Box>
-      )
-      const infoOnTop = rt.linkPosition === 'top'
-      return (
-        <Box flexDirection="column">
-          {infoOnTop && info}
-          <Box key="scene" flexShrink={0}>
-            {scene}
-          </Box>
-          {!infoOnTop && info}
+          {rt.linkPosition === 'bottom' && link}
         </Box>
       )
     }
     if (e.surface === 'desktop') {
       const { Box, Text, Button, Svg } = $.ui.resolve(e)
       rt.mounts.set(e.requestId, mount)
-      const hasLink = rt.linkPosition !== 'hidden'
-      const info = (hasLink || withSummary) && (
-        <Box key="info" flexDirection="row" justifyContent="space-between" gap={2}>
-          <Box flexShrink={1}>{withSummary && <Text dimColor>{summary()}</Text>}</Box>
-          {hasLink && (
-            <Box flexShrink={0}>
-              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
-            </Box>
-          )}
+      const link = rt.linkPosition !== 'hidden' && (
+        <Box key="link" flexDirection="row" justifyContent="flex-end">
+          <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
         </Box>
       )
-      const infoOnTop = rt.linkPosition === 'top'
       return (
         <Box flexDirection="column">
-          {infoOnTop && info}
-          <Box key="scene" flexShrink={0}>
+          {rt.linkPosition === 'top' && link}
+          <Box key="village" flexDirection="column" flexShrink={0}>
             <Svg
               source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
               alt={rt.t('alt.village', { summary: summary() })}
               width={mount.width * VECTOR_SCALE[rt.pixel]}
               height={mount.height * VECTOR_SCALE[rt.pixel]}
             />
+            {withSummary && <Text dimColor>{summary()}</Text>}
           </Box>
-          {!infoOnTop && info}
+          {rt.linkPosition === 'bottom' && link}
         </Box>
       )
     }
