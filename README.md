@@ -124,7 +124,8 @@ To try local changes, start Claude Code with `claude --plugin-dir /path/to/WorkV
 
 Versions follow [Semantic Versioning](https://semver.org/). To release, set the same version in
 `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, add a section to
-`CHANGELOG.md`, and tag the merge commit as `vX.Y.Z`.
+`CHANGELOG.md`, and tag the merge commit as `vX.Y.Z`. Pushing the tag runs the release workflow,
+which checks the versions and publishes a GitHub Release with that changelog section.
 
 The source is laid out as follows:
 
