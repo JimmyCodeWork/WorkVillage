@@ -34,6 +34,8 @@ const VECTOR_CELL_PX = 8
 const PALETTES: readonly Palette[] = ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark']
 
 type PixelSize = 'small' | 'medium' | 'large'
+/** Where the row holding the settings link sits, if anywhere. */
+type LinkPosition = 'top' | 'bottom' | 'hidden'
 /** CSS pixels per scene pixel on vector surfaces. */
 const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 2, large: 3 }
 
@@ -74,6 +76,7 @@ type Runtime = {
   animation: 'full' | 'reduced' | 'off'
   size: SceneSize
   pixel: PixelSize
+  linkPosition: LinkPosition
   palette: Palette
   /** The terminal draws pictures (kitty graphics protocol). */
   hasGraphics: boolean
@@ -96,6 +99,7 @@ const rt: Runtime = {
   animation: 'full',
   size: 'small',
   pixel: 'small',
+  linkPosition: 'top',
   palette: 'color',
   hasGraphics: false,
   language: 'auto',
@@ -332,6 +336,7 @@ export const register: Register = (on, options) => {
   rt.size = options.size === 'medium' ? 'medium' : 'small'
   rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
   rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
+  rt.linkPosition = options.link === 'bottom' || options.link === 'hidden' ? options.link : 'top'
   rt.language = options.language
   rt.options = options
 
@@ -372,8 +377,9 @@ export const register: Register = (on, options) => {
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
       const { Box, Text, Button, Raster, Image } = $.ui.resolve(e)
-      // The scene, then one row: the summary (medium size) and the settings link.
-      if (e.props.maxRows < mount.rows + 2) {
+      const hasLink = rt.linkPosition !== 'hidden'
+      const hasRow = hasLink || withSummary
+      if (e.props.maxRows < mount.rows + (hasRow ? 2 : 1)) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
       }
@@ -384,31 +390,52 @@ export const register: Register = (on, options) => {
         ) : (
           <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={rasterCells(frame(mount))} />
         )
-      return (
-        <Box flexDirection="column">
-          <Box key="scene" flexShrink={0}>
-            {scene}
+      // One row beside the picture: the summary (medium size) and the settings link.
+      const info = hasRow && (
+        <Box key="info" flexDirection="row" justifyContent="space-between" gap={2} width={mount.columns}>
+          <Box flexShrink={1}>
+            {withSummary && (
+              <Text dimColor wrap="truncate-end">
+                {summary()}
+              </Text>
+            )}
           </Box>
-          <Box key="footer" flexDirection="row" justifyContent="space-between" gap={2} width={mount.columns}>
-            <Box flexShrink={1}>
-              {withSummary && (
-                <Text dimColor wrap="truncate-end">
-                  {summary()}
-                </Text>
-              )}
-            </Box>
+          {hasLink && (
             <Box flexShrink={0}>
               <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
             </Box>
+          )}
+        </Box>
+      )
+      const infoOnTop = rt.linkPosition === 'top'
+      return (
+        <Box flexDirection="column">
+          {infoOnTop && info}
+          <Box key="scene" flexShrink={0}>
+            {scene}
           </Box>
+          {!infoOnTop && info}
         </Box>
       )
     }
     if (e.surface === 'desktop') {
       const { Box, Text, Button, Svg } = $.ui.resolve(e)
       rt.mounts.set(e.requestId, mount)
+      const hasLink = rt.linkPosition !== 'hidden'
+      const info = (hasLink || withSummary) && (
+        <Box key="info" flexDirection="row" justifyContent="space-between" gap={2}>
+          <Box flexShrink={1}>{withSummary && <Text dimColor>{summary()}</Text>}</Box>
+          {hasLink && (
+            <Box flexShrink={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
+            </Box>
+          )}
+        </Box>
+      )
+      const infoOnTop = rt.linkPosition === 'top'
       return (
         <Box flexDirection="column">
+          {infoOnTop && info}
           <Box key="scene" flexShrink={0}>
             <Svg
               source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
@@ -417,12 +444,7 @@ export const register: Register = (on, options) => {
               height={mount.height * VECTOR_SCALE[rt.pixel]}
             />
           </Box>
-          <Box key="footer" flexDirection="row" justifyContent="space-between" gap={2}>
-            <Box flexShrink={1}>{withSummary && <Text dimColor>{summary()}</Text>}</Box>
-            <Box flexShrink={0}>
-              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
-            </Box>
-          </Box>
+          {!infoOnTop && info}
         </Box>
       )
     }
