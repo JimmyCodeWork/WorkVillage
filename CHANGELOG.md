@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.7 - 2026-10-14
+
+- Fixed: a choice in the settings pane could snap back and not take effect. Choices now apply at once
+  and hold for the session even before (or without) the engine storing them; a failure to store one is
+  reported in a toast.
+- Fixed: the settings pane could still flicker on the desktop. The scene now holds still while the
+  settings pane is open, and the pane redraws only when a choice is made. A **Done** button closes it.
+
 ## 0.2.6 - 2026-10-14
 
 - Reading and thinking now grow the village. A read sends a villager to read by the fire, and a

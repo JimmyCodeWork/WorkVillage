@@ -47,6 +47,11 @@ const isHidden = atom({ plugin: 'workvillage', key: 'isHidden' } as const, false
  * with the animation.
  */
 const animationFrame = atom({ plugin: 'workvillage', key: 'frame' } as const, 0)
+/**
+ * Settings chosen in the settings pane this session. They apply at once and
+ * survive a reload, whether or not the engine has stored them yet.
+ */
+const chosenSettings = atom({ plugin: 'workvillage', key: 'chosen' } as const, {} as Record<string, string>)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
 
 /**
@@ -99,6 +104,10 @@ type Runtime = {
   mounts: Map<string, Mount>
   /** The userConfig values as loaded, for the settings panel. */
   options: Readonly<Record<string, unknown>>
+  /** The POSIX locale variables, read at start, for a language change. */
+  locales: readonly (string | undefined)[]
+  /** While the settings pane is open the vector scene holds still. */
+  isSettingsOpen: boolean
 }
 
 // The module's own state: rebuilt from $.store at each session.start, so a
@@ -117,6 +126,8 @@ const rt: Runtime = {
   isReady: false,
   mounts: new Map(),
   options: {},
+  locales: [],
+  isSettingsOpen: false,
 }
 
 function summary(): string {
@@ -236,7 +247,10 @@ function tick($: EngineInterface): void {
     }
   }
   // Vector surfaces redraw the whole scene, so they move at a calmer pace.
-  if (hasVector && (rt.scene.tick % 4 === 0 || isBusy(rt.scene))) void update($, animationFrame, n => n + 1)
+  // It holds still while the settings pane is open, so nothing redraws under a choice being made.
+  if (hasVector && !rt.isSettingsOpen && (rt.scene.tick % 4 === 0 || isBusy(rt.scene))) {
+    void update($, animationFrame, n => n + 1)
+  }
 }
 
 async function blitRaster($: EngineInterface, requestId: string, cells: string): Promise<void> {
@@ -267,9 +281,25 @@ async function detectGraphics($: EngineInterface): Promise<boolean> {
   )
 }
 
+/** Applies the plugin options to the module's state. */
+function configure(options: Readonly<Record<string, unknown>>): void {
+  rt.options = options
+  rt.animation = options.animation === 'reduced' || options.animation === 'off' ? options.animation : 'full'
+  rt.size = options.size === 'medium' ? 'medium' : 'small'
+  rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
+  rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
+  rt.language = options.language
+  rt.t = translator(resolveLocale(rt.language, rt.locales))
+}
+
+function startTicker($: EngineInterface): void {
+  rt.ticker?.cancel()
+  rt.ticker = rt.animation === 'off' ? undefined : $.clock.every(rt.animation === 'reduced' ? 1000 : 125, () => tick($))
+}
+
 async function start($: EngineInterface): Promise<void> {
-  const locales = [await $.env.get('LC_ALL'), await $.env.get('LC_MESSAGES'), await $.env.get('LANG')]
-  rt.t = translator(resolveLocale(rt.language, locales))
+  rt.locales = [await $.env.get('LC_ALL'), await $.env.get('LC_MESSAGES'), await $.env.get('LANG')]
+  configure({ ...rt.options, ...(await read($, chosenSettings)) })
   rt.hasGraphics = await detectGraphics($)
   const root = await $.session.root()
   rt.storeKey = `village:${root}`
@@ -281,8 +311,7 @@ async function start($: EngineInterface): Promise<void> {
     description: rt.t('command.description'),
     argumentHint: '[show | hide | stats | settings | reset]',
   })
-  rt.ticker?.cancel()
-  rt.ticker = rt.animation === 'off' ? undefined : $.clock.every(rt.animation === 'reduced' ? 1000 : 125, () => tick($))
+  startTicker($)
 }
 
 /**
@@ -307,7 +336,13 @@ async function stop($: EngineInterface): Promise<void> {
 }
 
 async function openSettings($: EngineInterface): Promise<void> {
+  rt.isSettingsOpen = true
   await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
+}
+
+async function closeSettings($: EngineInterface): Promise<void> {
+  rt.isSettingsOpen = false
+  await $.ui.close({ id: SETTINGS_PANE })
 }
 
 async function setBandHidden($: EngineInterface, hidden: boolean): Promise<void> {
@@ -315,14 +350,25 @@ async function setBandHidden($: EngineInterface, hidden: boolean): Promise<void>
 }
 
 /**
- * Writes one of the plugin's userConfig fields as the /config menu would;
- * the engine then reloads the module with the new options.
+ * Applies a choice at once, then saves it as the /config menu would. The
+ * choice holds for the session even when saving fails, which a toast reports.
  */
 async function changeSetting($: EngineInterface, field: SettingField, value: string): Promise<void> {
-  const rows = await $.config.list()
-  const key = rows.find(row => row.key.endsWith(`.${field}`) && row.key.split('.')[0]?.startsWith('workvillage'))?.key
-  const result = await $.config.set({ key: key ?? `workvillage.${field}`, value })
-  if (result.deny !== undefined) $.ui.toast(rt.t('settings.denied', { reason: result.deny }))
+  const before = rt.animation
+  const chosen = await update($, chosenSettings, all => ({ ...all, [field]: value }))
+  configure({ ...rt.options, ...chosen })
+  if (rt.animation !== before) startTicker($)
+  await update($, revision, n => n + 1)
+  try {
+    const rows = await $.config.list()
+    const row =
+      rows.find(r => r.provider.plugin.startsWith('workvillage') && r.key.endsWith(`.${field}`)) ??
+      rows.find(r => r.key.endsWith(`.${field}`) && r.key.startsWith('workvillage'))
+    const result = await $.config.set({ key: row?.key ?? `workvillage.${field}`, value })
+    if (result.deny !== undefined) $.ui.toast(rt.t('settings.denied', { reason: result.deny }))
+  } catch (error) {
+    $.ui.toast(rt.t('settings.denied', { reason: error instanceof Error ? error.message : String(error) }))
+  }
 }
 
 async function runCommand($: EngineInterface, args: string): Promise<{ text: string }> {
@@ -358,12 +404,7 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
 }
 
 export const register: Register = (on, options) => {
-  rt.animation = options.animation === 'reduced' || options.animation === 'off' ? options.animation : 'full'
-  rt.size = options.size === 'medium' ? 'medium' : 'small'
-  rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
-  rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
-  rt.language = options.language
-  rt.options = options
+  configure(options)
 
   on('session.start', async ($, e, next) => {
     await ensureStarted($)
@@ -498,7 +539,16 @@ export const register: Register = (on, options) => {
     )
   })
 
+  on('ui.close', async ($, e, next) => {
+    if (e.id === SETTINGS_PANE) rt.isSettingsOpen = false
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
   on('ui.render', { component: 'Pane', requestId: SETTINGS_PANE }, async ($, e) => {
+    await ensureStarted($)
+    rt.isSettingsOpen = true
+    // Redraws only when a choice is made, never with the animation.
+    await read($, chosenSettings)
     const { t } = rt
     const label = (field: SettingField, value: string) => t(`option.${field}.${value}` as Parameters<Translate>[0])
     const hidden = await read($, isHidden)
@@ -516,6 +566,7 @@ export const register: Register = (on, options) => {
           <Button {...visibility} />
           {SETTINGS.map(setting => {
             const current = settingValue(setting, rt.options[setting.field])
+
             return (
               <Box flexDirection="column">
                 <Text bold>{t(`setting.${setting.field}`)}</Text>
@@ -537,7 +588,10 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column">
         <Text dimColor>{t('settings.hint')}</Text>
-        <Button {...visibility} />
+        <Box flexDirection="row" gap={2}>
+          <Button {...visibility} />
+          <Button key="done" label={t('settings.done')} variant="primary" onPress={() => closeSettings($)} />
+        </Box>
         {SETTINGS.map(setting => (
           <Select
             key={setting.field}

@@ -53,6 +53,7 @@ export const zhTW: Messages = {
   'alt.village': '像素風村莊：{summary}',
 
   'settings.open': '設定',
+  'settings.done': '完成',
   'settings.title': 'WorkVillage 設定',
   'settings.hint': '變更會立即套用，並儲存至 Claude Code 設定。',
   'settings.denied': 'WorkVillage：無法變更此設定（{reason}）。',
