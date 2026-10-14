@@ -79,4 +79,8 @@ export const zhTW: Messages = {
   'option.animation.off': '關閉（靜態畫面）',
   'settings.hideVillage': '隱藏輸入框上方的村莊',
   'settings.showVillage': '顯示輸入框上方的村莊',
+  'setting.link': '設定連結位置',
+  'option.link.top': '村莊上方',
+  'option.link.bottom': '村莊下方',
+  'option.link.hidden': '隱藏（改用 /village settings）',
 }

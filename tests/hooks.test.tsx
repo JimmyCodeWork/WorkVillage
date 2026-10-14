@@ -128,7 +128,7 @@ test('the settings button opens a panel that writes the plugin options', async (
   await band.unmount()
 
   const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...SETTINGS_PANE })
-  expect((await panel.findAll({ type: 'Select' })).length).toBe(5)
+  expect((await panel.findAll({ type: 'Select' })).length).toBe(6)
   await panel.press({ key: 'visibility' })
   expect(await panel.find({ type: 'Button', key: 'visibility', text: /Show the village/ })).toBeDefined()
   await panel.select({ key: 'palette', value: 'mono-dark' })
@@ -163,5 +163,38 @@ test('the settings link never squeezes the scene', async ($, on) => {
   expect(/"columns":(\d+)/.exec(JSON.stringify(raster))?.[1]).toBe('100')
   const link = JSON.stringify(await terminal.find({ key: 'settings' }))
   expect(link).toMatch(/"plain":true/)
+  // The link has a row of its own, not over the picture.
+  expect(JSON.stringify(await terminal.find({ key: 'scene' }))).not.toMatch(/"key":"settings"/)
+  expect(JSON.stringify(await terminal.find({ key: 'info' }))).toMatch(/"key":"settings"/)
   await terminal.unmount()
 })
+
+for (const [link, order] of [
+  ['top', 'info first'],
+  ['bottom', 'scene first'],
+  ['hidden', 'no link'],
+] as const) {
+  test(`the settings link sits ${link === 'hidden' ? 'nowhere' : link} when set to ${link}`, { options: { link } }, async ($, on) => {
+    mock.clock(on, { now: 0 })
+    mock.store(on)
+    mock.env(on, { LANG: 'en_US.UTF-8' })
+    on('session.root', () => ({ value: `/work/link-${link}` }))
+    on('command.register', () => ({ value: { command: 'village' } }))
+    on('session.start', (_$, e) => e)
+
+    await $.session.start({ cwd: `/work/link-${link}`, surface: 'terminal', isInteractive: true })
+    for (const surface of ['terminal', 'desktop'] as const) {
+      const ui = await $.ui.mount({ plugin: 'workvillage', surface, ...BAND })
+      const tree = JSON.stringify(await ui.find({ type: 'Box' }))
+      if (order === 'no link') {
+        expect(await ui.find({ key: 'settings' })).toBeUndefined()
+      } else {
+        const info = tree.indexOf('"key":"info"')
+        const scene = tree.indexOf('"key":"scene"')
+        expect(info).toBeGreaterThan(-1)
+        expect(order === 'info first' ? info < scene : info > scene).toBe(true)
+      }
+      await ui.unmount()
+    }
+  })
+}

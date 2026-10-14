@@ -1,6 +1,6 @@
 {
   "name": "workvillage",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A pixel-art village above your prompt that grows as your project progresses.",
   "author": { "name": "JimmyCodeWork" },
   "homepage": "https://github.com/JimmyCodeWork/WorkVillage",
@@ -36,6 +36,13 @@
       "description": "How large each pixel is drawn. small uses half-size pixels in kitty and Ghostty and finer pixels on the desktop; other terminals draw two pixels per character cell at every setting.",
       "default": "small",
       "options": ["small", "medium", "large"]
+    },
+    "link": {
+      "type": "string",
+      "title": "Settings link",
+      "description": "Where the Settings link sits: top above the village, bottom below it, or hidden (open the settings with /village settings).",
+      "default": "top",
+      "options": ["top", "bottom", "hidden"]
     },
     "animation": {
       "type": "string",
