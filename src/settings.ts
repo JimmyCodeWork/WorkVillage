@@ -1,7 +1,7 @@
 // The settings the village offers in its own panel, mirroring the
 // manifest's userConfig fields.
 
-export type SettingField = 'palette' | 'size' | 'pixel' | 'link' | 'language' | 'animation'
+export type SettingField = 'palette' | 'size' | 'pixel' | 'language' | 'animation'
 
 export type Setting = { field: SettingField; options: readonly string[]; fallback: string }
 
@@ -9,7 +9,6 @@ export const SETTINGS: readonly Setting[] = [
   { field: 'palette', options: ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark'], fallback: 'color' },
   { field: 'size', options: ['small', 'medium'], fallback: 'small' },
   { field: 'pixel', options: ['small', 'medium', 'large'], fallback: 'small' },
-  { field: 'link', options: ['panel', 'hint', 'top', 'bottom', 'hidden'], fallback: 'panel' },
   { field: 'language', options: ['auto', 'en', 'zh-TW'], fallback: 'auto' },
   { field: 'animation', options: ['full', 'reduced', 'off'], fallback: 'full' },
 ]

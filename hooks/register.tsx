@@ -22,8 +22,6 @@ import { signalsFor } from '../src/signals'
 
 const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
-/** The small pane of its own that holds the settings link. */
-const BAR_PANE = 'workvillage-bar'
 const SETTINGS_KEY = 'settings'
 const SCENE_KEY = 'village'
 /** Widest band per size, in terminal columns. */
@@ -39,14 +37,16 @@ const VECTOR_CELL_PX = 8
 const PALETTES: readonly Palette[] = ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark']
 
 type PixelSize = 'small' | 'medium' | 'large'
-const LINK_POSITIONS: readonly LinkPosition[] = ['panel', 'hint', 'top', 'bottom', 'hidden']
-/** Where the settings link sits, if anywhere. */
-type LinkPosition = 'panel' | 'hint' | 'top' | 'bottom' | 'hidden'
 /** CSS pixels per scene pixel on vector surfaces. */
 const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 2, large: 3 }
 
 const isHidden = atom({ plugin: 'workvillage', key: 'isHidden' } as const, false)
-const isBarClosed = atom({ plugin: 'workvillage', key: 'isBarClosed' } as const, false)
+/**
+ * Bumped on each animation frame a vector surface should redraw. Only the
+ * scene's own drawings read it, so other panes (the settings) never redraw
+ * with the animation.
+ */
+const animationFrame = atom({ plugin: 'workvillage', key: 'frame' } as const, 0)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
 
 /**
@@ -83,7 +83,6 @@ type Runtime = {
   animation: 'full' | 'reduced' | 'off'
   size: SceneSize
   pixel: PixelSize
-  linkPosition: LinkPosition
   palette: Palette
   /** The terminal draws pictures (kitty graphics protocol). */
   hasGraphics: boolean
@@ -108,7 +107,6 @@ const rt: Runtime = {
   animation: 'full',
   size: 'small',
   pixel: 'small',
-  linkPosition: 'panel',
   palette: 'color',
   hasGraphics: false,
   language: 'auto',
@@ -236,8 +234,8 @@ function tick($: EngineInterface): void {
       void blitRaster($, requestId, rasterCells(frame(mount, hour)))
     }
   }
-  // Vector surfaces redraw the whole tree, so they move at a calmer pace.
-  if (hasVector && (rt.scene.tick % 4 === 0 || isBusy(rt.scene))) $.ui.invalidate('ui.render')
+  // Vector surfaces redraw the whole scene, so they move at a calmer pace.
+  if (hasVector && (rt.scene.tick % 4 === 0 || isBusy(rt.scene))) void update($, animationFrame, n => n + 1)
 }
 
 async function blitRaster($: EngineInterface, requestId: string, cells: string): Promise<void> {
@@ -282,8 +280,6 @@ async function start($: EngineInterface): Promise<void> {
     description: rt.t('command.description'),
     argumentHint: '[show | hide | stats | settings | reset]',
   })
-  // Not awaited: a pane that cannot be placed must not hold up the village.
-  void syncBar($).catch(() => undefined)
   rt.ticker?.cancel()
   rt.ticker = rt.animation === 'off' ? undefined : $.clock.every(rt.animation === 'reduced' ? 1000 : 125, () => tick($))
 }
@@ -311,15 +307,6 @@ async function stop($: EngineInterface): Promise<void> {
 
 async function openSettings($: EngineInterface): Promise<void> {
   await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
-}
-
-/** Opens the settings pane's small pane of its own, unless the person closed it this session. */
-async function syncBar($: EngineInterface): Promise<void> {
-  if (rt.linkPosition === 'panel' && !(await read($, isBarClosed))) {
-    await $.ui.open({ id: BAR_PANE, title: 'WorkVillage', rows: 1 })
-  } else {
-    await $.ui.close({ id: BAR_PANE })
-  }
 }
 
 async function setBandHidden($: EngineInterface, hidden: boolean): Promise<void> {
@@ -374,7 +361,6 @@ export const register: Register = (on, options) => {
   rt.size = options.size === 'medium' ? 'medium' : 'small'
   rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
   rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
-  rt.linkPosition = LINK_POSITIONS.find(p => p === options.link) ?? 'panel'
   rt.language = options.language
   rt.options = options
 
@@ -410,14 +396,11 @@ export const register: Register = (on, options) => {
       rt.mounts.delete(e.requestId)
       return next(e)
     }
-    const size = rt.size
-    const mount = layout(e.surface, e.props.bodyColumns, size)
-    // The small band is the picture alone; /village stats has the numbers.
-    const withSummary = size === 'medium'
+    const mount = layout(e.surface, e.props.bodyColumns, rt.size)
     if (e.surface === 'terminal') {
       const { Box, Text, Button, Raster, Image } = $.ui.resolve(e)
-      const hasLink = rt.linkPosition === 'top' || rt.linkPosition === 'bottom'
-      if (e.props.maxRows < mount.rows + (withSummary ? 1 : 0) + (hasLink ? 1 : 0) + 1) {
+      // The resources row, then the scene.
+      if (e.props.maxRows < mount.rows + 2) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
       }
@@ -428,94 +411,50 @@ export const register: Register = (on, options) => {
         ) : (
           <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={rasterCells(frame(mount))} />
         )
-      // The settings link is a row of its own, apart from the village block.
-      const link = hasLink && (
-        <Box key="link" flexDirection="row" justifyContent="flex-end" width={mount.columns}>
-          <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
-        </Box>
-      )
       return (
         <Box flexDirection="column">
-          {rt.linkPosition === 'top' && link}
-          <Box key="village" flexDirection="column" flexShrink={0}>
-            {scene}
-            {withSummary && (
+          <Box key="header" flexDirection="row" justifyContent="space-between" gap={2} width={mount.columns}>
+            <Box flexShrink={1}>
               <Text dimColor wrap="truncate-end">
                 {summary()}
               </Text>
-            )}
+            </Box>
+            <Box flexShrink={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+            </Box>
           </Box>
-          {rt.linkPosition === 'bottom' && link}
+          <Box key="village" flexShrink={0}>
+            {scene}
+          </Box>
         </Box>
       )
     }
     if (e.surface === 'desktop') {
+      await read($, animationFrame)
       const { Box, Text, Button, Svg } = $.ui.resolve(e)
       rt.mounts.set(e.requestId, mount)
-      const link = (rt.linkPosition === 'top' || rt.linkPosition === 'bottom') && (
-        <Box key="link" flexDirection="row" justifyContent="flex-end">
-          <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain dimColor onPress={() => openSettings($)} />
-        </Box>
-      )
       return (
         <Box flexDirection="column">
-          {rt.linkPosition === 'top' && link}
-          <Box key="village" flexDirection="column" flexShrink={0} alignItems="center">
+          <Box key="header" flexDirection="row" justifyContent="space-between" alignItems="center" gap={2}>
+            <Box flexShrink={1}>
+              <Text dimColor>{summary()}</Text>
+            </Box>
+            <Box flexShrink={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+            </Box>
+          </Box>
+          <Box key="village" flexShrink={0} alignItems="center">
             <Svg
               source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
               alt={rt.t('alt.village', { summary: summary() })}
               width={mount.width * VECTOR_SCALE[rt.pixel]}
               height={mount.height * VECTOR_SCALE[rt.pixel]}
             />
-            {withSummary && <Text dimColor>{summary()}</Text>}
           </Box>
-          {rt.linkPosition === 'bottom' && link}
         </Box>
       )
     }
     return next(e)
-  }).catch(($, e, next) => next(e))
-
-  on('ui.render', { component: 'Pane', requestId: BAR_PANE }, async ($, e) => {
-    await ensureStarted($)
-    const { t } = rt
-    const hidden = await read($, isHidden)
-    const { Box, Button } = $.ui.resolve(e)
-    return (
-      <Box flexDirection="row" gap={2}>
-        <Button key={SETTINGS_KEY} label={t('settings.open')} plain onPress={() => openSettings($)} />
-        <Button
-          key="visibility"
-          label={t(hidden ? 'settings.showVillage' : 'settings.hideVillage')}
-          plain
-          dimColor
-          onPress={() => setBandHidden($, !hidden)}
-        />
-      </Box>
-    )
-  })
-
-  on('ui.close', async ($, e, next) => {
-    // Remember a close by the person, so the bar stays shut this session.
-    if (e.id === BAR_PANE && e.origin.kind === 'person') await update($, isBarClosed, () => true)
-    return next(e)
-  }).catch(($, e, next) => next(e))
-
-  // The settings link can also live on the hint line under the prompt, a
-  // block of its own, so the village above the prompt keeps its layout.
-  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
-    if (rt.linkPosition !== 'hint' || e.props.isDraft || e.props.isWorking) return next(e)
-    await ensureStarted($)
-    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
-    const { Box, Text, Button } = $.ui.resolve(e)
-    return (
-      <Box flexDirection="row" gap={2}>
-        <Text dimColor wrap="truncate-end">
-          {e.props.hint}
-        </Text>
-        <Button key={SETTINGS_KEY} label={`WorkVillage ${rt.t('settings.open')}`} plain dimColor onPress={() => openSettings($)} />
-      </Box>
-    )
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -539,6 +478,7 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
+    await read($, animationFrame)
     const { Box, Text, Svg } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">

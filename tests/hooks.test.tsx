@@ -25,8 +25,8 @@ test('the band draws the village and follows the work', async ($, on) => {
   await $.session.start({ cwd: '/work/project', surface: 'terminal', isInteractive: true })
   const ui = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
   expect(await ui.find({ key: 'village' })).toBeDefined()
-  // The default small band is the picture alone.
-  expect(await ui.find({ type: 'Text' })).toBeUndefined()
+  // The resources sit on a row above the picture.
+  expect(await ui.find({ type: 'Text', text: /Camp/ })).toBeDefined()
   await ui.unmount()
 
   await $.tool.call({ tool: 'Edit', file_path: '/x', old_string: 'a', new_string: 'b' } as never)
@@ -87,24 +87,6 @@ test('the mono palette draws the band in black and white', { options: { palette:
   await desktop.unmount()
 })
 
-const HINT = {
-  component: 'PromptHint',
-  props: { isDraft: false, isWorking: false, hint: '? for shortcuts' },
-} as const
-
-const BAR_PANE = {
-  component: 'Pane',
-  requestId: 'workvillage-bar',
-  props: {
-    title: 'WorkVillage',
-    isFocused: false,
-    bodyColumns: 80,
-    placement: 'inline',
-    scroll: { offset: 0, bodyRows: 1, contentRows: 0 },
-    view: {},
-  },
-} as const
-
 const SETTINGS_PANE = {
   component: 'Pane',
   requestId: 'workvillage-settings',
@@ -118,7 +100,7 @@ const SETTINGS_PANE = {
   },
 } as const
 
-test('the settings button opens a panel that writes the plugin options', async ($, on) => {
+test('the resources row above the village holds the settings button', async ($, on) => {
   mock.clock(on, { now: 0 })
   mock.store(on)
   mock.env(on, { LANG: 'en_US.UTF-8' })
@@ -138,18 +120,25 @@ test('the settings button opens a panel that writes the plugin options', async (
   })
 
   await $.session.start({ cwd: '/work/settings', surface: 'terminal', isInteractive: true })
-  // By default the link has a small pane of its own, outside the village band.
-  expect(opened).toContain('workvillage-bar')
-  const band = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
-  expect(await band.find({ key: 'settings' })).toBeUndefined()
-  await band.unmount()
-  const bar = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAR_PANE })
-  await bar.press({ key: 'settings' })
-  expect(opened.at(-1)).toBe('workvillage-settings')
-  await bar.unmount()
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const band = await $.ui.mount({ plugin: 'workvillage', surface, ...BAND })
+    const tree = JSON.stringify(await band.find({ type: 'Box' }))
+    // The resources row comes first, the village under it.
+    expect(tree.indexOf('"key":"header"')).toBeGreaterThan(-1)
+    expect(tree.indexOf('"key":"header"')).toBeLessThan(tree.indexOf('"key":"village"'))
+    const header = JSON.stringify(await band.find({ key: 'header' }))
+    expect(header).toMatch(/Camp/)
+    expect(header).toMatch(/"key":"settings"/)
+    // A button, not a plain text link.
+    expect(JSON.stringify(await band.find({ key: 'settings' }))).not.toMatch(/"plain":true/)
+    await band.press({ key: 'settings' })
+    expect(opened.at(-1)).toBe('workvillage-settings')
+    await band.unmount()
+  }
 
   const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...SETTINGS_PANE })
-  expect((await panel.findAll({ type: 'Select' })).length).toBe(6)
+  expect((await panel.findAll({ type: 'Select' })).length).toBe(5)
+  expect(await panel.find({ key: 'link' })).toBeUndefined()
   await panel.press({ key: 'visibility' })
   expect(await panel.find({ type: 'Button', key: 'visibility', text: /Show the village/ })).toBeDefined()
   await panel.select({ key: 'palette', value: 'mono-dark' })
@@ -162,7 +151,7 @@ test('the settings button opens a panel that writes the plugin options', async (
   await mobile.unmount()
 })
 
-test('the settings link never squeezes the scene', { options: { link: 'top' } }, async ($, on) => {
+test('the scene keeps its full width under the resources row', async ($, on) => {
   mock.clock(on, { now: 0 })
   mock.store(on)
   mock.env(on, { LANG: 'en_US.UTF-8' })
@@ -172,95 +161,38 @@ test('the settings link never squeezes the scene', { options: { link: 'top' } },
 
   await $.session.start({ cwd: '/work/layout', surface: 'desktop', isInteractive: true })
   const desktop = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
-  const scene = JSON.stringify(await desktop.find({ key: 'village' }))
-  expect(scene).toMatch(/"flexShrink":0/)
+  expect(JSON.stringify(await desktop.find({ key: 'village' }))).toMatch(/"flexShrink":0/)
   const width = Number(/"width":(\d+(?:\.\d+)?)/.exec(JSON.stringify(await desktop.find({ type: 'Svg' })))?.[1])
   expect(width).toBeGreaterThanOrEqual(450)
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
-  expect(JSON.stringify(await terminal.find({ key: 'village' }))).toMatch(/"flexShrink":0/)
-  const raster = await terminal.find({ type: 'Raster' })
-  expect(/"columns":(\d+)/.exec(JSON.stringify(raster))?.[1]).toBe('100')
-  const link = JSON.stringify(await terminal.find({ key: 'settings' }))
-  expect(link).toMatch(/"plain":true/)
-  // The link has a row of its own, apart from the village block.
+  expect(/"columns":(\d+)/.exec(JSON.stringify(await terminal.find({ type: 'Raster' })))?.[1]).toBe('100')
   expect(JSON.stringify(await terminal.find({ key: 'village' }))).not.toMatch(/"key":"settings"/)
-  expect(JSON.stringify(await terminal.find({ key: 'link' }))).toMatch(/"key":"settings"/)
   await terminal.unmount()
 })
 
-for (const [link, order] of [
-  ['top', 'info first'],
-  ['bottom', 'scene first'],
-  ['hidden', 'no link'],
-] as const) {
-  test(`the settings link sits ${link === 'hidden' ? 'nowhere' : link} when set to ${link}`, { options: { link } }, async ($, on) => {
-    mock.clock(on, { now: 0 })
-    mock.store(on)
-    mock.env(on, { LANG: 'en_US.UTF-8' })
-    on('session.root', () => ({ value: `/work/link-${link}` }))
-    on('command.register', () => ({ value: { command: 'village' } }))
-    on('session.start', (_$, e) => e)
-
-    await $.session.start({ cwd: `/work/link-${link}`, surface: 'terminal', isInteractive: true })
-    for (const surface of ['terminal', 'desktop'] as const) {
-      const ui = await $.ui.mount({ plugin: 'workvillage', surface, ...BAND })
-      const tree = JSON.stringify(await ui.find({ type: 'Box' }))
-      if (order === 'no link') {
-        expect(await ui.find({ key: 'settings' })).toBeUndefined()
-      } else {
-        const info = tree.indexOf('"key":"link"')
-        const scene = tree.indexOf('"key":"village"')
-        expect(info).toBeGreaterThan(-1)
-        expect(order === 'info first' ? info < scene : info > scene).toBe(true)
-      }
-      await ui.unmount()
-    }
-  })
-}
-
-test('the settings link never joins the village block, at any size', { options: { size: 'medium', link: 'top' } }, async ($, on) => {
-  mock.clock(on, { now: 0 })
+test('the animation never redraws the settings pane', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
   mock.store(on)
   mock.env(on, { LANG: 'en_US.UTF-8' })
-  on('session.root', () => ({ value: '/work/block' }))
+  on('session.root', () => ({ value: '/work/flicker' }))
   on('command.register', () => ({ value: { command: 'village' } }))
   on('session.start', (_$, e) => e)
-
-  await $.session.start({ cwd: '/work/block', surface: 'terminal', isInteractive: true })
-  const ui = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
-  const village = JSON.stringify(await ui.find({ key: 'village' }))
-  // The summary stays under the picture, as before the link existed.
-  expect(village).toMatch(/Camp/)
-  expect(village).not.toMatch(/"key":"settings"/)
-  expect(JSON.stringify(await ui.find({ key: 'link' }))).not.toMatch(/Camp/)
-  await ui.unmount()
-})
-
-test('the hint line keeps the engine hint and steps aside while typing or working', { options: { link: 'hint' } }, async ($, on) => {
-  mock.clock(on, { now: 0 })
-  mock.store(on)
-  mock.env(on, { LANG: 'zh_TW.UTF-8' })
-  on('session.root', () => ({ value: '/work/hint' }))
-  on('command.register', () => ({ value: { command: 'village' } }))
-  on('session.start', (_$, e) => e)
-  // Stands in for the engine's own hint line beneath the plugin.
-  on('ui.render', { component: 'PromptHint' }, ($, e) => {
-    const { Text } = $.ui.resolve(e)
-    return <Text key="engine">{e.props.hint}</Text>
+  let invalidated = 0
+  on('ui.invalidate', () => {
+    invalidated++
+    return { value: undefined }
   })
 
-  await $.session.start({ cwd: '/work/hint', surface: 'terminal', isInteractive: true })
-  const idle = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...HINT })
-  expect(await idle.find({ type: 'Button', key: 'settings', text: /設定/ })).toBeDefined()
-  await idle.unmount()
-  for (const props of [{ ...HINT.props, isDraft: true }, { ...HINT.props, isWorking: true }]) {
-    const busy = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', component: 'PromptHint', props })
-    expect(await busy.find({ key: 'settings' })).toBeUndefined()
-    expect(await busy.find({ type: 'Text', text: '? for shortcuts' })).toBeDefined()
-    await busy.unmount()
-  }
+  await $.session.start({ cwd: '/work/flicker', surface: 'desktop', isInteractive: true })
+  const band = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
+  const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...SETTINGS_PANE })
+  await clock.advance(2000)
+  // The scene moves by its own state, never by redrawing everything the plugin drew.
+  expect(invalidated).toBe(0)
+  await panel.unmount()
+  await band.unmount()
 })
 
 test('a draw that comes before session.start still shows the village', async ($, on) => {
@@ -298,27 +230,3 @@ test('the scene fills a wide band instead of leaving room on the right', async (
   await desktop.unmount()
 })
 
-for (const link of ['panel', 'top'] as const) {
-  test(`the settings bar pane is ${link === 'panel' ? 'opened' : 'closed'} when link is ${link}`, { options: { link } }, async ($, on) => {
-    mock.clock(on, { now: 0 })
-    mock.store(on)
-    mock.env(on, { LANG: 'en_US.UTF-8' })
-    on('session.root', () => ({ value: `/work/bar-${link}` }))
-    on('command.register', () => ({ value: { command: 'village' } }))
-    on('session.start', (_$, e) => e)
-    const calls: string[] = []
-    on('ui.open', (_$, e) => {
-      calls.push(`open:${e.id}`)
-      return { value: { isPlaced: true } }
-    })
-    on('ui.close', (_$, e) => {
-      calls.push(`close:${e.id}`)
-      return { value: undefined }
-    })
-
-    await $.session.start({ cwd: `/work/bar-${link}`, surface: 'desktop', isInteractive: true })
-    // The bar is opened without holding up the start: let that call land.
-    for (let i = 0; i < 20 && calls.length === 0; i++) await Promise.resolve()
-    expect(calls).toEqual([link === 'panel' ? 'open:workvillage-bar' : 'close:workvillage-bar'])
-  })
-}

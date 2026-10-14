@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- The resources now sit on a row above the village at every size, with a **Settings** button at its
+  right end. The `link` setting, the WorkVillage bar pane and the hint-line link are removed.
+- Fixed: the settings pane flickered on the desktop. The scene's animation redrew everything the
+  plugin drew; it now redraws only the scene.
+
 ## 0.2.5 - 2026-10-14
 
 - Fixed: after changing a setting such as the pixel size, the village could vanish until
