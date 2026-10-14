@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.4 - 2026-10-14
 
 - The **WorkVillage Settings** link now sits at the end of the hint line under the prompt by default,
   outside the village's block (`link: hint`). It steps aside while you type or while a turn runs, and
