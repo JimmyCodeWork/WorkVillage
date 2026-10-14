@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.5 - 2026-10-14
 
 - Fixed: after changing a setting such as the pixel size, the village could vanish until
   `/village show`. A draw that reaches the reloaded module before `session.start` now starts it.
