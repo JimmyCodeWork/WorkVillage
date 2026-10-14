@@ -115,6 +115,13 @@ bun scripts/preview.ts docs/images   # 產生預覽圖
 
 若要測試本機修改，請以 `claude --plugin-dir /path/to/WorkVillage` 啟動 Claude Code。
 
+### 發佈版本
+
+版本號遵循[語意化版本](https://semver.org/lang/zh-TW/)。發佈時，請在
+`.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json` 設定相同的版本號，
+於 `CHANGELOG.md` 新增對應段落，並將合併後的 commit 標記為 `vX.Y.Z`。
+Claude Code 會依 manifest 中的版本號判斷是否提供更新給已安裝的使用者。
+
 原始碼結構如下：
 
 - `src/core`：村莊規則與數值平衡（純函式）
