@@ -230,3 +230,62 @@ test('the scene fills a wide band instead of leaving room on the right', async (
   await desktop.unmount()
 })
 
+
+test('a choice in the settings pane applies at once and does not snap back', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/choose' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  on('ui.toast', () => ({ value: undefined }))
+  on('config.list', () => ({ value: [] }))
+  // The engine refuses to store it: the choice must still hold for the session.
+  on('config.set', () => ({ deny: 'not stored here' }))
+
+  await $.session.start({ cwd: '/work/choose', surface: 'desktop', isInteractive: true })
+  const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...SETTINGS_PANE })
+  await panel.select({ key: 'palette', value: 'mono-dark' })
+  expect(JSON.stringify(await panel.find({ type: 'Select', key: 'palette' }))).toMatch(/"value":"mono-dark"/)
+  await panel.unmount()
+
+  const band = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
+  const svg = JSON.stringify(await band.find({ type: 'Svg' }))
+  expect(svg).toMatch(/#000000/)
+  expect(svg).not.toMatch(/fill=\\?"#(?!000000|ffffff)/)
+  await band.unmount()
+})
+
+test('the scene holds still while the settings pane is open', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/still' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.close', () => ({ value: undefined }))
+  let frames = 0
+  on('state.set', (_$, e, next) => {
+    if ((e as { key?: string }).key === 'frame') frames++
+    return next(e)
+  })
+
+  await $.session.start({ cwd: '/work/still', surface: 'desktop', isInteractive: true })
+  const band = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
+  await clock.advance(2000)
+  expect(frames).toBeGreaterThan(0)
+
+  await band.press({ key: 'settings' })
+  const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...SETTINGS_PANE })
+  const before = frames
+  await clock.advance(2000)
+  expect(frames).toBe(before)
+
+  // Done closes the pane and the scene moves again.
+  await panel.press({ key: 'done' })
+  await clock.advance(2000)
+  expect(frames).toBeGreaterThan(before)
+  await panel.unmount()
+  await band.unmount()
+})

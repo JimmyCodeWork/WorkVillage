@@ -12,6 +12,8 @@ declare module 'claude-code' {
       revision: number
       /** The animation frame vector surfaces redraw on; only scene drawings read it. */
       frame: number
+      /** Settings chosen in the settings pane this session, by field. */
+      chosen: Record<string, string>
     }
   }
 }

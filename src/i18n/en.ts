@@ -51,6 +51,7 @@ export const en = {
   'alt.village': 'A pixel-art village: {summary}',
 
   'settings.open': 'Settings',
+  'settings.done': 'Done',
   'settings.title': 'WorkVillage settings',
   'settings.hint': 'Changes apply at once and are saved to your Claude Code settings.',
   'settings.denied': 'WorkVillage: the setting could not be changed ({reason}).',
