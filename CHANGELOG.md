@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Click the village to open a row of actions above it (Settings, Hide village, Close) instead of a
-  button beside it, so the scene keeps its full width.
+- The settings button beside the village is now a plain **Settings** link in its bottom-right corner,
+  laid over the picture, so the scene keeps its full width. The settings panel can also hide or show
+  the village.
 - On the desktop the scene fills the available width at the chosen pixel size, instead of a small box.
 
 ## 0.2.0 - 2026-10-14

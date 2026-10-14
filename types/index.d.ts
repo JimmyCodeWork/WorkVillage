@@ -10,8 +10,6 @@ declare module 'claude-code' {
       isHidden: boolean
       /** Bumped whenever the village changes, so text and vector views redraw. */
       revision: number
-      /** Whether the row of actions above the village is open (a click toggles it). */
-      isMenuOpen: boolean
     }
   }
 }

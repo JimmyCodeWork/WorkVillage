@@ -77,6 +77,6 @@ export const zhTW: Messages = {
   'option.animation.full': '完整',
   'option.animation.reduced': '精簡（每秒更新一次）',
   'option.animation.off': '關閉（靜態畫面）',
-  'menu.hide': '隱藏村莊',
-  'menu.close': '關閉',
+  'settings.hideVillage': '隱藏輸入框上方的村莊',
+  'settings.showVillage': '顯示輸入框上方的村莊',
 }

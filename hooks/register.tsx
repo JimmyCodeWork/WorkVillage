@@ -23,7 +23,6 @@ import { signalsFor } from '../src/signals'
 const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
 const SETTINGS_KEY = 'settings'
-const CLICKER_KEY = 'clicker'
 const SCENE_KEY = 'village'
 /** Widest band per size, in terminal columns. */
 const MAX_COLUMNS: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
@@ -40,7 +39,6 @@ const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 
 
 const isHidden = atom({ plugin: 'workvillage', key: 'isHidden' } as const, false)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
-const isMenuOpen = atom({ plugin: 'workvillage', key: 'isMenuOpen' } as const, false)
 
 /**
  * How one site draws the scene: `raster` is half-block cells (two pixels a
@@ -280,18 +278,11 @@ async function stop($: EngineInterface): Promise<void> {
 }
 
 async function openSettings($: EngineInterface): Promise<void> {
-  await update($, isMenuOpen, () => false)
   await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
 }
 
-async function hideBand($: EngineInterface): Promise<void> {
-  await update($, isMenuOpen, () => false)
-  await update($, isHidden, () => true)
-  $.ui.toast(rt.t('command.hidden'))
-}
-
-async function toggleMenu($: EngineInterface): Promise<void> {
-  await update($, isMenuOpen, open => !open)
+async function setBandHidden($: EngineInterface, hidden: boolean): Promise<void> {
+  await update($, isHidden, () => hidden)
 }
 
 /**
@@ -377,12 +368,11 @@ export const register: Register = (on, options) => {
     }
     const size = rt.size
     const mount = layout(e.surface, e.props.bodyColumns, size)
-    const menuOpen = await read($, isMenuOpen)
     // The small band is the picture alone; /village stats has the numbers.
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
-      const { Box, Text, Button, Raster, Image, Client } = $.ui.resolve(e)
-      if (e.props.maxRows < mount.rows + (withSummary ? 2 : 1) + (menuOpen ? 1 : 0)) {
+      const { Box, Text, Button, Raster, Image } = $.ui.resolve(e)
+      if (e.props.maxRows < mount.rows + (withSummary ? 2 : 1)) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
       }
@@ -395,18 +385,11 @@ export const register: Register = (on, options) => {
         )
       return (
         <Box flexDirection="column">
-          {menuOpen && (
-            <Box flexDirection="row" gap={2}>
-              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
-              <Button key="hide" label={rt.t('menu.hide')} onPress={() => hideBand($)} />
-              <Button key="close" label={rt.t('menu.close')} onPress={() => toggleMenu($)} />
-            </Box>
-          )}
           <Box key="scene" flexShrink={0}>
             {scene}
-            {/* Laid over the picture: a click on the village toggles the row above. */}
-            <Box position="absolute" top={0} left={0} width={mount.columns} height={mount.rows}>
-              <Client key={CLICKER_KEY} module="./clicker.tsx" width="100%" height="100%" />
+            {/* A plain text link in the corner, laid over the picture so it takes no room. */}
+            <Box position="absolute" right={0} bottom={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain onPress={() => openSettings($)} />
             </Box>
           </Box>
           {withSummary && (
@@ -418,17 +401,10 @@ export const register: Register = (on, options) => {
       )
     }
     if (e.surface === 'desktop') {
-      const { Box, Text, Button, Svg, Client } = $.ui.resolve(e)
+      const { Box, Text, Button, Svg } = $.ui.resolve(e)
       rt.mounts.set(e.requestId, mount)
       return (
         <Box flexDirection="column">
-          {menuOpen && (
-            <Box flexDirection="row" gap={1}>
-              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
-              <Button key="hide" label={rt.t('menu.hide')} onPress={() => hideBand($)} />
-              <Button key="close" label={rt.t('menu.close')} onPress={() => toggleMenu($)} />
-            </Box>
-          )}
           <Box key="scene" flexShrink={0}>
             <Svg
               source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
@@ -436,8 +412,8 @@ export const register: Register = (on, options) => {
               width={mount.width * VECTOR_SCALE[rt.pixel]}
               height={mount.height * VECTOR_SCALE[rt.pixel]}
             />
-            <Box position="absolute" top={0} left={0} width="100%" height="100%">
-              <Client key={CLICKER_KEY} module="./clicker.tsx" width="100%" height="100%" />
+            <Box position="absolute" right={0} bottom={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain onPress={() => openSettings($)} />
             </Box>
           </Box>
           {withSummary && <Text dimColor>{summary()}</Text>}
@@ -478,21 +454,22 @@ export const register: Register = (on, options) => {
     )
   })
 
-  on('ui.message', async ($, e, next) => {
-    if (e.element !== CLICKER_KEY) return next(e)
-    await toggleMenu($)
-    return {}
-  })
-
   on('ui.render', { component: 'Pane', requestId: SETTINGS_PANE }, async ($, e) => {
     const { t } = rt
     const label = (field: SettingField, value: string) => t(`option.${field}.${value}` as Parameters<Translate>[0])
+    const hidden = await read($, isHidden)
+    const visibility = {
+      key: 'visibility',
+      label: t(hidden ? 'settings.showVillage' : 'settings.hideVillage'),
+      onPress: () => setBandHidden($, !hidden),
+    }
     if (e.surface === 'mobile') {
       // No Select on mobile: one Button per choice, the current one marked.
       const { Box, Text, Button } = $.ui.resolve(e)
       return (
         <Box flexDirection="column">
           <Text dimColor>{t('settings.hint')}</Text>
+          <Button {...visibility} />
           {SETTINGS.map(setting => {
             const current = settingValue(setting, rt.options[setting.field])
             return (
@@ -512,10 +489,11 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const { Box, Text, Select } = $.ui.resolve(e)
+    const { Box, Text, Button, Select } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
         <Text dimColor>{t('settings.hint')}</Text>
+        <Button {...visibility} />
         {SETTINGS.map(setting => (
           <Select
             key={setting.field}

@@ -62,7 +62,7 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 
 ## 設定
 
-點一下村莊，上方會出現一列操作按鈕（**設定**、**隱藏村莊**、**關閉**）；或執行 `/village settings`，即可開啟設定面板，
+點選村莊右下角的「**設定**」，或執行 `/village settings`，即可開啟設定面板（亦可在此隱藏或顯示村莊），
 變更會立即套用。相同的設定也可在 `/config` 選單的 **workvillage** 項目下調整。
 
 | 設定 | 可用值 | 預設值 |
