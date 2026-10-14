@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 - 2026-10-14
 
 - First release: a pixel-art village above the prompt that grows from wilderness as you work.
 - Villagers fell trees, quarry stone, farm and build in response to edits, reads, passing tests,
