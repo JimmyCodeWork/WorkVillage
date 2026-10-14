@@ -121,6 +121,8 @@ bun scripts/preview.ts docs/images   # 產生預覽圖
 `.claude-plugin/plugin.json` 與 `.claude-plugin/marketplace.json` 設定相同的版本號，
 於 `CHANGELOG.md` 新增對應段落，並將合併後的 commit 標記為 `vX.Y.Z`。
 推送 tag 後會觸發發佈工作流程，檢查版本號並以該版本的 CHANGELOG 內容建立 GitHub Release。
+亦可不推送 tag，改至 Actions 頁籤手動執行（選擇 **Release**，在 `main` 上按 **Run workflow** 並輸入版本號），
+工作流程會同時在 `main` 上建立 tag 與 Release。
 
 原始碼結構如下：
 
