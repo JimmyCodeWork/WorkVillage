@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 - 2026-10-14
 
 - A settings button beside the village, and `/village settings`, open a panel for colours, size,
   pixel size, language and animation; changes apply at once.
