@@ -26,9 +26,9 @@
     "palette": {
       "type": "string",
       "title": "Colours",
-      "description": "color is full colour, grayscale shades of grey, mono black-and-white line art (in your terminal's own text colour).",
+      "description": "color is full colour and grayscale shades of grey. The mono palettes are black-and-white line art: mono follows your terminal's own colours, mono-light is black on white and mono-dark white on black.",
       "default": "color",
-      "options": ["color", "grayscale", "mono"]
+      "options": ["color", "grayscale", "mono", "mono-light", "mono-dark"]
     },
     "pixel": {
       "type": "string",

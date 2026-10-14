@@ -1,6 +1,12 @@
 import type { Canvas } from './canvas'
 
-export type Palette = 'color' | 'grayscale' | 'mono'
+/**
+ * `mono` follows the terminal's own colours (light paper elsewhere);
+ * `mono-light` is black ink on white paper and `mono-dark` white on black.
+ */
+export type Palette = 'color' | 'grayscale' | 'mono' | 'mono-light' | 'mono-dark'
+
+export const isMono = (palette: Palette): boolean => palette.startsWith('mono')
 
 /** Ink and paper of the black-and-white palette. */
 export const MONO_INK = 0x000000
@@ -56,5 +62,12 @@ export function toMonochrome(canvas: Canvas, backdrop: Int32Array, ground: numbe
     }
   }
   pixels.set(out)
+  return canvas
+}
+
+/** Swaps ink and paper, in place: the dark black-and-white version. */
+export function invertMonochrome(canvas: Canvas): Canvas {
+  const { pixels } = canvas
+  for (let i = 0; i < pixels.length; i++) pixels[i] = pixels[i] === MONO_INK ? MONO_PAPER : MONO_INK
   return canvas
 }

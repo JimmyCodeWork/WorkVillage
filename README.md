@@ -67,20 +67,28 @@ Change these in the `/config` menu, under **workvillage**.
 | Setting | Values | Default |
 | --- | --- | --- |
 | `size` | `small` (7 rows, up to 120 columns), `medium` (10 rows, full width, with a summary line) | `small` |
-| `palette` | `color`, `grayscale`, `mono` | `color` |
+| `palette` | `color`, `grayscale`, `mono`, `mono-light`, `mono-dark` | `color` |
 | `pixel` | `small`, `medium`, `large` (see below) | `small` |
 | `language` | `auto`, `en`, `zh-TW` | `auto` (follows `LC_ALL`, `LC_MESSAGES` or `LANG`) |
 | `animation` | `full`, `reduced`, `off` | `full` |
 
 ### Black and white
 
-`palette: mono` draws the village as black-and-white line art. In the terminal it uses your
-terminal's own text and background colours, so it suits light and dark themes alike.
-`palette: grayscale` keeps every shade, in grey.
+The `mono` palettes draw the village as black-and-white line art, in a light and a dark version:
 
-| `mono` | `grayscale` |
+| Palette | Look |
 | --- | --- |
-| ![Mono](docs/images/04-village-mono.png) | ![Grayscale](docs/images/04-village-grayscale.png) |
+| `mono` | Follows your terminal's own text and background colours, so it suits light and dark themes alike; light elsewhere |
+| `mono-light` | Black ink on white |
+| `mono-dark` | White ink on black |
+
+`grayscale` keeps every shade, in grey.
+
+| `mono-light` | `mono-dark` |
+| --- | --- |
+| ![Light line art](docs/images/04-village-mono.png) | ![Dark line art](docs/images/04-village-mono-dark.png) |
+
+![Grayscale](docs/images/04-village-grayscale.png)
 
 ## Where it draws
 

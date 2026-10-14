@@ -52,6 +52,12 @@ describe('render', () => {
 describe('palettes', () => {
   const village = createVillage(1, 0)
 
+  test('mono-dark is mono with ink and paper swapped', () => {
+    const light = renderFrame(village, createScene(village), 60, { hour: 12 }, { palette: 'mono-light' })
+    const dark = renderFrame(village, createScene(village), 60, { hour: 12 }, { palette: 'mono-dark' })
+    light.pixels.forEach((c, i) => expect(dark.pixels[i]).toBe(c === MONO_INK ? MONO_PAPER : MONO_INK))
+  })
+
   test('grayscale leaves only shades of grey', () => {
     const frame = renderFrame(village, createScene(village), 80, { hour: 12 }, { palette: 'grayscale' })
     for (const c of frame.pixels) expect(((c >> 16) & 255) === (c & 255) && ((c >> 8) & 255) === (c & 255)).toBe(true)

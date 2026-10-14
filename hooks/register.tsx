@@ -26,6 +26,8 @@ const MAX_COLUMNS: Readonly<Record<SceneSize, number>> = { small: 120, medium: 2
 /** Widest vector scene, in scene pixels. */
 const MAX_VECTOR_WIDTH = 200
 
+const PALETTES: readonly Palette[] = ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark']
+
 type PixelSize = 'small' | 'medium' | 'large'
 /** CSS pixels per scene pixel on vector surfaces. */
 const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 2, large: 3 }
@@ -296,7 +298,7 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
 export const register: Register = (on, options) => {
   rt.animation = options.animation === 'reduced' || options.animation === 'off' ? options.animation : 'full'
   rt.size = options.size === 'medium' ? 'medium' : 'small'
-  rt.palette = options.palette === 'grayscale' || options.palette === 'mono' ? options.palette : 'color'
+  rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
   rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
   rt.language = options.language
 

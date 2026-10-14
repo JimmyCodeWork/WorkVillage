@@ -25,7 +25,7 @@ import { drawVillager, VILLAGER_HEIGHT } from '../art/villager'
 import type { BuildingKind } from '../core/balance'
 import { BUILDINGS } from '../core/balance'
 import { hash01, wildPlot, type Plot, type Village } from '../core/world'
-import { toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
+import { invertMonochrome, isMono, toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
 import { createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
 import { isWorked, plotCenter, PLOT, type Scene } from './sim'
 
@@ -215,7 +215,7 @@ export function renderFrame(
 ): Canvas {
   const palette = style.palette ?? 'color'
   // Line art reads best by daylight; night would turn it to solid ink.
-  const sky = skyFor(palette === 'mono' ? 12 : time.hour)
+  const sky = skyFor(isMono(palette) ? 12 : time.hour)
   const canvas = createCanvas(width, style.height ?? SCENE_HEIGHTS.medium)
   const GROUND = groundOf(canvas)
   const camera = Math.round(plotCenter(village.camp) - width / 2)
@@ -258,7 +258,8 @@ export function renderFrame(
     for (const { sprite, x, y } of lit) drawSprite(canvas, sprite, x, y, { only: P.window })
   }
   if (palette === 'grayscale') return toGrayscale(canvas)
-  if (palette === 'mono') return toMonochrome(canvas, background, GROUND)
+  if (palette === 'mono-dark') return invertMonochrome(toMonochrome(canvas, background, GROUND))
+  if (isMono(palette)) return toMonochrome(canvas, background, GROUND)
   return canvas
 }
 
