@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.7 - 2026-10-14
 
 - Fixed: a choice in the settings pane could snap back and not take effect. Choices now apply at once
   and hold for the session even before (or without) the engine storing them; a failure to store one is
