@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.3 - 2026-10-14
 
 - The **Settings** link is a row of its own, apart from the village: at the medium size the summary
   stays under the picture as before, instead of sharing the link's row.
