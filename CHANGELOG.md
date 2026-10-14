@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.1 - 2026-10-14
 
 - The settings button beside the village is now a plain **Settings** link in its bottom-right corner,
   laid over the picture, so the scene keeps its full width. The settings panel can also hide or show
