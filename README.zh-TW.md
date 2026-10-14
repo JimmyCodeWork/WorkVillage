@@ -57,11 +57,13 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 | `/village` | 開啟村莊面板，檢視資源與開發活動 |
 | `/village show` / `/village hide` | 顯示或隱藏輸入框上方的村莊 |
 | `/village stats` | 列出村莊資源與開發活動統計 |
+| `/village settings` | 開啟設定面板 |
 | `/village reset confirm` | 將此專案的村莊重置為荒野 |
 
 ## 設定
 
-可在 `/config` 選單的 **workvillage** 項目下調整。
+點選村莊旁的 **≡** 按鈕（桌面版為 **設定**），或執行 `/village settings`，即可開啟設定面板，
+變更會立即套用。相同的設定也可在 `/config` 選單的 **workvillage** 項目下調整。
 
 | 設定 | 可用值 | 預設值 |
 | --- | --- | --- |

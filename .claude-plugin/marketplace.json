@@ -9,7 +9,7 @@
       "name": "workvillage",
       "source": "./",
       "description": "A pixel-art village above your prompt that grows as your project progresses.",
-      "version": "0.1.0"
+      "version": "0.2.0"
     }
   ]
 }

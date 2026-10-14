@@ -86,3 +86,53 @@ test('the mono palette draws the band in black and white', { options: { palette:
   expect(JSON.stringify(svg)).not.toMatch(/fill=\\?"#(?!000000|ffffff)/)
   await desktop.unmount()
 })
+
+const SETTINGS_PANE = {
+  component: 'Pane',
+  requestId: 'workvillage-settings',
+  props: {
+    title: 'WorkVillage settings',
+    isFocused: true,
+    bodyColumns: 80,
+    placement: 'dock',
+    scroll: { offset: 0, bodyRows: 20, contentRows: 0 },
+    view: {},
+  },
+} as const
+
+test('the settings button opens a panel that writes the plugin options', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/settings' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  const opened: string[] = []
+  on('ui.open', (_$, e) => {
+    opened.push(e.id)
+    return { value: { isPlaced: true } }
+  })
+  on('config.list', () => ({ value: [] }))
+  const written: [string, unknown][] = []
+  on('config.set', (_$, e) => {
+    written.push([e.key, e.value])
+    return { value: e.value }
+  })
+
+  await $.session.start({ cwd: '/work/settings', surface: 'terminal', isInteractive: true })
+  const band = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
+  await band.press({ key: 'settings' })
+  expect(opened).toEqual(['workvillage-settings'])
+  await band.unmount()
+
+  const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...SETTINGS_PANE })
+  expect((await panel.findAll({ type: 'Select' })).length).toBe(5)
+  await panel.select({ key: 'palette', value: 'mono-dark' })
+  expect(written).toEqual([['workvillage.palette', 'mono-dark']])
+  await panel.unmount()
+
+  const mobile = await $.ui.mount({ plugin: 'workvillage', surface: 'mobile', ...SETTINGS_PANE })
+  await mobile.press({ key: 'size:medium' })
+  expect(written.at(-1)).toEqual(['workvillage.size', 'medium'])
+  await mobile.unmount()
+})
