@@ -1,1 +1,113 @@
 # WorkVillage
+
+**A pixel-art village above your Claude Code prompt that grows as your project progresses.**
+
+English | [繁體中文](README.zh-TW.md)
+
+![A finished village by day](docs/images/04-village.png)
+
+Every project starts as untouched wilderness: a single settler and a campfire in the forest.
+As you and Claude work, villagers walk out to fell trees, quarry stone, plant fields and raise
+buildings. The camp becomes a hamlet, then a village, a town and eventually a city.
+
+| Wilderness | Hamlet | Night |
+| --- | --- | --- |
+| ![Wilderness](docs/images/01-wilderness.png) | ![Hamlet](docs/images/03-hamlet.png) | ![Night](docs/images/06-night.png) |
+
+## Install
+
+At the prompt of a Claude Code terminal session:
+
+```
+/plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
+```
+
+Answer `y` to add the marketplace, then choose a scope. From a shell:
+
+```
+claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
+```
+
+In the desktop app, click **+** next to the prompt box, then **Plugins**, **Add marketplace** with
+`JimmyCodeWork/WorkVillage`, then **Add plugin**.
+
+Requires Claude Code 2.1.275 or later.
+
+## How your work shapes the village
+
+| What happens in your session | What the villagers do |
+| --- | --- |
+| A file is edited | Fell a tree or clear a stump for **timber**, or work on the current building |
+| A new file is written | Quarry a boulder for **stone** |
+| Files are read or searched | Gather **knowledge**; now and then forage for food |
+| A test run passes | Plant, water and harvest fields for **food** |
+| A `git commit` succeeds | A milestone: a big push on the current building |
+| A to-do or task is completed | A new villager arrives, if there is a home for them |
+
+Buildings are raised in order: Tent, Hut, Well, Storehouse, House, Workshop and Watchtower.
+Each costs timber and stone and takes several steps of work to finish. When the trees near the
+camp are gone, the clearing extends further into the forest. The sky follows your local time,
+and at night the villagers gather around the fire.
+
+Failed tool calls never cost you anything: the village only ever grows.
+
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `/village` | Open the village pane with resources and activity |
+| `/village show` / `/village hide` | Show or hide the band above the prompt |
+| `/village stats` | Print the village's resources and your activity |
+| `/village reset confirm` | Return this project's village to wilderness |
+
+## Settings
+
+Change these in the `/config` menu, under **workvillage**.
+
+| Setting | Values | Default |
+| --- | --- | --- |
+| `language` | `auto`, `en`, `zh-TW` | `auto` (follows `LC_ALL`, `LC_MESSAGES` or `LANG`) |
+| `animation` | `full`, `reduced`, `off` | `full` |
+
+## Where it draws
+
+- **Terminal**: a 10-row pixel scene drawn with half-block characters, animated in place. When the
+  terminal is too short, a one-line summary is shown instead.
+- **Claude Code Desktop**: the same scene as crisp SVG.
+- **Mobile**: available in the `/village` pane.
+
+## Privacy
+
+WorkVillage makes no network requests and sends no telemetry. It only counts what kind of work
+happened (an edit, a read, a passing test). It never stores file names, file contents, commands or
+prompts. Each project's village is saved in WorkVillage's own plugin store, keyed by the project's
+root directory.
+
+## Development
+
+```
+claude plugin validate .   # check the manifest and hooks module
+claude plugin test .       # run the test suite
+tsc -p .                   # type-check (after Claude Code has loaded the mod once)
+bun scripts/preview.ts docs/images   # render the preview images
+```
+
+To try local changes, start Claude Code with `claude --plugin-dir /path/to/WorkVillage`.
+
+The source is laid out as follows:
+
+- `src/core`: the village's rules and balance, as pure functions
+- `src/scene`: villager animation and frame composition
+- `src/art`: the palette, sprites and villager poses
+- `src/pixel`: the framebuffer and its terminal and SVG encoders
+- `src/i18n`: English and Traditional Chinese strings
+- `hooks/register.tsx`: wires Claude Code events to the village
+
+## Artwork
+
+All pixel art in WorkVillage was drawn for this project and is released under the same licence
+as the code. It is not derived from any other game or asset pack.
+
+## License
+
+[MIT](LICENSE)

@@ -1,0 +1,27 @@
+{
+  "name": "workvillage",
+  "version": "0.1.0",
+  "description": "A pixel-art village above your prompt that grows as your project progresses.",
+  "author": { "name": "JimmyCodeWork" },
+  "homepage": "https://github.com/JimmyCodeWork/WorkVillage",
+  "repository": "https://github.com/JimmyCodeWork/WorkVillage",
+  "license": "MIT",
+  "keywords": ["pixel-art", "village", "game", "status", "mod"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "language": {
+      "type": "string",
+      "title": "Language",
+      "description": "Interface language: auto follows your system locale.",
+      "default": "auto",
+      "options": ["auto", "en", "zh-TW"]
+    },
+    "animation": {
+      "type": "string",
+      "title": "Animation",
+      "description": "full animates villagers smoothly, reduced updates once a second, off draws a still picture.",
+      "default": "full",
+      "options": ["full", "reduced", "off"]
+    }
+  }
+}

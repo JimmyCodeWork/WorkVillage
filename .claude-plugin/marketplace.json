@@ -1,0 +1,14 @@
+{
+  "name": "workvillage",
+  "description": "WorkVillage: a pixel-art village for Claude Code that grows with your project.",
+  "owner": {
+    "name": "JimmyCodeWork"
+  },
+  "plugins": [
+    {
+      "name": "workvillage",
+      "source": "./",
+      "description": "A pixel-art village above your prompt that grows as your project progresses."
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+import type { Messages } from './index'
+
+export const zhTW: Messages = {
+  'pane.title': 'WorkVillage 小村莊',
+  'command.description': '顯示村莊、查看統計或隱藏（show | hide | stats | reset）',
+  'command.shown': '村莊已顯示於輸入框上方。',
+  'command.hidden': '村莊已隱藏。執行 /village show 即可重新顯示。',
+  'command.opened': '已開啟村莊面板。',
+  'command.reset': '此專案的村莊已重置為未開墾的荒野。',
+  'command.resetConfirm': '此操作將清除本專案的所有進度。如確定要執行，請輸入 /village reset confirm。',
+  'command.usage': '用法：/village [show | hide | stats | reset]',
+
+  'stage.camp': '營地',
+  'stage.hamlet': '聚落',
+  'stage.village': '村莊',
+  'stage.town': '城鎮',
+  'stage.city': '城市',
+
+  'building.tent': '帳篷',
+  'building.hut': '茅屋',
+  'building.well': '水井',
+  'building.storehouse': '倉庫',
+  'building.house': '民宅',
+  'building.workshop': '工坊',
+  'building.tower': '瞭望塔',
+
+  'resource.wood': '木材',
+  'resource.stone': '石材',
+  'resource.food': '糧食',
+  'resource.knowledge': '知識',
+  'resource.villagers': '村民',
+
+  'stat.edits': '編輯次數',
+  'stat.reads': '讀取次數',
+  'stat.tests': '測試通過次數',
+  'stat.commits': '提交次數',
+  'stat.tasks': '已完成任務',
+  'stat.turns': '對話回合',
+
+  'summary.line': '{stage}・村民 {villagers}・木材 {wood}・石材 {stone}・糧食 {food}',
+  'summary.next': '下一個建設：{building}（木材 {wood}、石材 {stone}）',
+  'summary.building': '建設中：{building} {percent}%',
+  'pane.stats': '開發活動',
+  'pane.resources': '資源',
+  'pane.wide': '請加寬視窗以顯示村莊。',
+
+  'toast.built': 'WorkVillage：新的{building}已落成。',
+  'toast.stage': 'WorkVillage：你的據點已發展為{stage}！',
+  'toast.arrived': 'WorkVillage：新村民加入了（目前共 {villagers} 人）。',
+  'toast.expanded': 'WorkVillage：開墾範圍已向森林延伸。',
+
+  'alt.village': '像素風村莊：{summary}',
+}
