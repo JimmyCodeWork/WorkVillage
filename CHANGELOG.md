@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- The settings button no longer squeezes the village: the scene keeps its full size beside it, and on
-  the desktop the scene fills the available width at the chosen pixel size.
+- Click the village to open a row of actions above it (Settings, Hide village, Close) instead of a
+  button beside it, so the scene keeps its full width.
+- On the desktop the scene fills the available width at the chosen pixel size, instead of a small box.
 
 ## 0.2.0 - 2026-10-14
 

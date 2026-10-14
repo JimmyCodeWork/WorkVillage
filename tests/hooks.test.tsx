@@ -121,8 +121,15 @@ test('the settings button opens a panel that writes the plugin options', async (
 
   await $.session.start({ cwd: '/work/settings', surface: 'terminal', isInteractive: true })
   const band = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
+  // The menu row is closed until the village is clicked.
+  expect(await band.find({ type: 'Button', key: 'settings' })).toBeUndefined()
+  await band.pointer({ type: 'down', x: 10, y: 3, button: 'left', in: 'clicker' })
+  await band.pointer({ type: 'up', x: 10, y: 3, button: 'left', in: 'clicker' })
+  expect(await band.find({ type: 'Button', key: 'settings' })).toBeDefined()
   await band.press({ key: 'settings' })
   expect(opened).toEqual(['workvillage-settings'])
+  // Opening the settings closes the menu row again.
+  expect(await band.find({ type: 'Button', key: 'settings' })).toBeUndefined()
   await band.unmount()
 
   const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...SETTINGS_PANE })
@@ -137,7 +144,7 @@ test('the settings button opens a panel that writes the plugin options', async (
   await mobile.unmount()
 })
 
-test('the settings button never squeezes the scene', async ($, on) => {
+test('the clickable layer never squeezes the scene', async ($, on) => {
   mock.clock(on, { now: 0 })
   mock.store(on)
   mock.env(on, { LANG: 'en_US.UTF-8' })
@@ -150,11 +157,13 @@ test('the settings button never squeezes the scene', async ($, on) => {
   const scene = JSON.stringify(await desktop.find({ key: 'scene' }))
   expect(scene).toMatch(/"flexShrink":0/)
   const width = Number(/"width":(\d+(?:\.\d+)?)/.exec(JSON.stringify(await desktop.find({ type: 'Svg' })))?.[1])
-  expect(width).toBeGreaterThanOrEqual(400)
+  expect(width).toBeGreaterThanOrEqual(450)
   await desktop.unmount()
 
   const terminal = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
   expect(JSON.stringify(await terminal.find({ key: 'scene' }))).toMatch(/"flexShrink":0/)
-  expect(JSON.stringify(await terminal.find({ type: 'Raster' }))).toMatch(/"columns":98/)
+  const raster = await terminal.find({ type: 'Raster' })
+  expect(/"columns":(\d+)/.exec(JSON.stringify(raster))?.[1]).toBe('100')
+  expect(await terminal.find({ key: 'clicker' })).toBeDefined()
   await terminal.unmount()
 })

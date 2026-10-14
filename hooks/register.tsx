@@ -23,8 +23,7 @@ import { signalsFor } from '../src/signals'
 const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
 const SETTINGS_KEY = 'settings'
-/** Columns the settings button takes beside the scene, its gap included. */
-const BUTTON_COLUMNS: Readonly<Record<string, number>> = { terminal: 2, desktop: 12 }
+const CLICKER_KEY = 'clicker'
 const SCENE_KEY = 'village'
 /** Widest band per size, in terminal columns. */
 const MAX_COLUMNS: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
@@ -41,6 +40,7 @@ const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 
 
 const isHidden = atom({ plugin: 'workvillage', key: 'isHidden' } as const, false)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
+const isMenuOpen = atom({ plugin: 'workvillage', key: 'isMenuOpen' } as const, false)
 
 /**
  * How one site draws the scene: `raster` is half-block cells (two pixels a
@@ -280,7 +280,18 @@ async function stop($: EngineInterface): Promise<void> {
 }
 
 async function openSettings($: EngineInterface): Promise<void> {
+  await update($, isMenuOpen, () => false)
   await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
+}
+
+async function hideBand($: EngineInterface): Promise<void> {
+  await update($, isMenuOpen, () => false)
+  await update($, isHidden, () => true)
+  $.ui.toast(rt.t('command.hidden'))
+}
+
+async function toggleMenu($: EngineInterface): Promise<void> {
+  await update($, isMenuOpen, open => !open)
 }
 
 /**
@@ -365,12 +376,13 @@ export const register: Register = (on, options) => {
       return next(e)
     }
     const size = rt.size
-    const mount = layout(e.surface, e.props.bodyColumns - (BUTTON_COLUMNS[e.surface] ?? 0), size)
+    const mount = layout(e.surface, e.props.bodyColumns, size)
+    const menuOpen = await read($, isMenuOpen)
     // The small band is the picture alone; /village stats has the numbers.
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
-      const { Box, Text, Button, Raster, Image } = $.ui.resolve(e)
-      if (e.props.maxRows < mount.rows + (withSummary ? 2 : 1)) {
+      const { Box, Text, Button, Raster, Image, Client } = $.ui.resolve(e)
+      if (e.props.maxRows < mount.rows + (withSummary ? 2 : 1) + (menuOpen ? 1 : 0)) {
         rt.mounts.delete(e.requestId)
         return <Text dimColor>{`⌂ ${summary()}`}</Text>
       }
@@ -383,12 +395,18 @@ export const register: Register = (on, options) => {
         )
       return (
         <Box flexDirection="column">
-          <Box flexDirection="row" gap={1}>
-            <Box key="scene" flexShrink={0}>
-              {scene}
+          {menuOpen && (
+            <Box flexDirection="row" gap={2}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+              <Button key="hide" label={rt.t('menu.hide')} onPress={() => hideBand($)} />
+              <Button key="close" label={rt.t('menu.close')} onPress={() => toggleMenu($)} />
             </Box>
-            <Box flexShrink={0}>
-              <Button key={SETTINGS_KEY} label="≡" plain onPress={() => openSettings($)} />
+          )}
+          <Box key="scene" flexShrink={0}>
+            {scene}
+            {/* Laid over the picture: a click on the village toggles the row above. */}
+            <Box position="absolute" top={0} left={0} width={mount.columns} height={mount.rows}>
+              <Client key={CLICKER_KEY} module="./clicker.tsx" width="100%" height="100%" />
             </Box>
           </Box>
           {withSummary && (
@@ -400,21 +418,26 @@ export const register: Register = (on, options) => {
       )
     }
     if (e.surface === 'desktop') {
-      const { Box, Text, Button, Svg } = $.ui.resolve(e)
+      const { Box, Text, Button, Svg, Client } = $.ui.resolve(e)
       rt.mounts.set(e.requestId, mount)
       return (
         <Box flexDirection="column">
-          <Box flexDirection="row" gap={1} alignItems="flex-start">
-            <Box key="scene" flexShrink={0}>
-              <Svg
-                source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
-                alt={rt.t('alt.village', { summary: summary() })}
-                width={mount.width * VECTOR_SCALE[rt.pixel]}
-                height={mount.height * VECTOR_SCALE[rt.pixel]}
-              />
-            </Box>
-            <Box flexShrink={0}>
+          {menuOpen && (
+            <Box flexDirection="row" gap={1}>
               <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+              <Button key="hide" label={rt.t('menu.hide')} onPress={() => hideBand($)} />
+              <Button key="close" label={rt.t('menu.close')} onPress={() => toggleMenu($)} />
+            </Box>
+          )}
+          <Box key="scene" flexShrink={0}>
+            <Svg
+              source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
+              alt={rt.t('alt.village', { summary: summary() })}
+              width={mount.width * VECTOR_SCALE[rt.pixel]}
+              height={mount.height * VECTOR_SCALE[rt.pixel]}
+            />
+            <Box position="absolute" top={0} left={0} width="100%" height="100%">
+              <Client key={CLICKER_KEY} module="./clicker.tsx" width="100%" height="100%" />
             </Box>
           </Box>
           {withSummary && <Text dimColor>{summary()}</Text>}
@@ -453,6 +476,12 @@ export const register: Register = (on, options) => {
         ))}
       </Box>
     )
+  })
+
+  on('ui.message', async ($, e, next) => {
+    if (e.element !== CLICKER_KEY) return next(e)
+    await toggleMenu($)
+    return {}
   })
 
   on('ui.render', { component: 'Pane', requestId: SETTINGS_PANE }, async ($, e) => {
