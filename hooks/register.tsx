@@ -24,12 +24,14 @@ const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
 const SETTINGS_KEY = 'settings'
 /** Columns the settings button takes beside the scene, its gap included. */
-const BUTTON_COLUMNS = 2
+const BUTTON_COLUMNS: Readonly<Record<string, number>> = { terminal: 2, desktop: 12 }
 const SCENE_KEY = 'village'
 /** Widest band per size, in terminal columns. */
 const MAX_COLUMNS: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
 /** Widest vector scene, in scene pixels. */
-const MAX_VECTOR_WIDTH = 200
+const MAX_VECTOR_WIDTH = 320
+/** Roughly how many CSS pixels one column of a vector surface is. */
+const VECTOR_CELL_PX = 8
 
 const PALETTES: readonly Palette[] = ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark']
 
@@ -186,7 +188,9 @@ async function apply($: EngineInterface, signals: readonly Signal[]): Promise<vo
 function layout(surface: string, bodyColumns: number, size: SceneSize): Mount {
   const columns = Math.max(24, Math.min(MAX_COLUMNS[size], Math.floor(bodyColumns)))
   if (surface !== 'terminal') {
-    const width = Math.min(columns, MAX_VECTOR_WIDTH)
+    // Fill the slot at the chosen pixel scale: a wider slot shows more village.
+    const fit = Math.floor((Math.floor(bodyColumns) * VECTOR_CELL_PX) / VECTOR_SCALE[rt.pixel])
+    const width = Math.max(48, Math.min(MAX_VECTOR_WIDTH, fit))
     return { kind: 'vector', width, height: SCENE_HEIGHTS[size], columns: 0, rows: 0 }
   }
   if (rt.pixel === 'small' && rt.hasGraphics) {
@@ -361,7 +365,7 @@ export const register: Register = (on, options) => {
       return next(e)
     }
     const size = rt.size
-    const mount = layout(e.surface, e.props.bodyColumns - BUTTON_COLUMNS, size)
+    const mount = layout(e.surface, e.props.bodyColumns - (BUTTON_COLUMNS[e.surface] ?? 0), size)
     // The small band is the picture alone; /village stats has the numbers.
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
@@ -380,8 +384,12 @@ export const register: Register = (on, options) => {
       return (
         <Box flexDirection="column">
           <Box flexDirection="row" gap={1}>
-            {scene}
-            <Button key={SETTINGS_KEY} label="≡" plain onPress={() => openSettings($)} />
+            <Box key="scene" flexShrink={0}>
+              {scene}
+            </Box>
+            <Box flexShrink={0}>
+              <Button key={SETTINGS_KEY} label="≡" plain onPress={() => openSettings($)} />
+            </Box>
           </Box>
           {withSummary && (
             <Text dimColor wrap="truncate-end">
@@ -396,9 +404,18 @@ export const register: Register = (on, options) => {
       rt.mounts.set(e.requestId, mount)
       return (
         <Box flexDirection="column">
-          <Box flexDirection="row" gap={1}>
-            <Svg source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])} alt={rt.t('alt.village', { summary: summary() })} />
-            <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+          <Box flexDirection="row" gap={1} alignItems="flex-start">
+            <Box key="scene" flexShrink={0}>
+              <Svg
+                source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
+                alt={rt.t('alt.village', { summary: summary() })}
+                width={mount.width * VECTOR_SCALE[rt.pixel]}
+                height={mount.height * VECTOR_SCALE[rt.pixel]}
+              />
+            </Box>
+            <Box flexShrink={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+            </Box>
           </Box>
           {withSummary && <Text dimColor>{summary()}</Text>}
         </Box>

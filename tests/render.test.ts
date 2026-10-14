@@ -31,9 +31,12 @@ describe('render', () => {
   })
 
   test('svg stays within the size a surface accepts', () => {
-    const village = createVillage(1, 0)
-    const svg = toSvg(renderFrame(village, createScene(village), 200, { hour: 22 }), 3)
-    expect(svg.length).toBeLessThan(131072)
+    let village = createVillage(1, 0)
+    for (let i = 0; i < 300; i++) village = applySignal(village, i % 7 === 6 ? 'commit' : i % 3 ? 'edit' : 'test').village
+    for (const hour of [12, 22]) {
+      const svg = toSvg(renderFrame(village, createScene(village), 320, { hour }), 3)
+      expect(svg.length).toBeLessThan(131072)
+    }
   })
 
   test('a villager walks to a tree, chops it, and the stump appears', () => {

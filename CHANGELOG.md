@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- The settings button no longer squeezes the village: the scene keeps its full size beside it, and on
+  the desktop the scene fills the available width at the chosen pixel size.
+
 ## 0.2.0 - 2026-10-14
 
 - A settings button beside the village, and `/village settings`, open a panel for colours, size,

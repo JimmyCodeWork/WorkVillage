@@ -136,3 +136,25 @@ test('the settings button opens a panel that writes the plugin options', async (
   expect(written.at(-1)).toEqual(['workvillage.size', 'medium'])
   await mobile.unmount()
 })
+
+test('the settings button never squeezes the scene', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/layout' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+
+  await $.session.start({ cwd: '/work/layout', surface: 'desktop', isInteractive: true })
+  const desktop = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
+  const scene = JSON.stringify(await desktop.find({ key: 'scene' }))
+  expect(scene).toMatch(/"flexShrink":0/)
+  const width = Number(/"width":(\d+(?:\.\d+)?)/.exec(JSON.stringify(await desktop.find({ type: 'Svg' })))?.[1])
+  expect(width).toBeGreaterThanOrEqual(400)
+  await desktop.unmount()
+
+  const terminal = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
+  expect(JSON.stringify(await terminal.find({ key: 'scene' }))).toMatch(/"flexShrink":0/)
+  expect(JSON.stringify(await terminal.find({ type: 'Raster' }))).toMatch(/"columns":98/)
+  await terminal.unmount()
+})
