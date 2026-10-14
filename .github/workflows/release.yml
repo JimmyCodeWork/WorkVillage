@@ -3,39 +3,68 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release from main, without the leading v (for example 0.1.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   release:
+    # A manual run releases main; a tag push releases the tagged commit.
+    if: github.event_name == 'push' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    env:
+      INPUT_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the tag matches the manifests
+      - name: Work out the version and tag
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v${INPUT_VERSION#v}"
+          fi
+          version="${tag#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$version' is not a semantic version"
+            exit 1
+          fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Check the version matches the manifests
+        run: |
           for file in .claude-plugin/plugin.json .claude-plugin/marketplace.json; do
-            if ! grep -q "\"version\": \"$version\"" "$file"; then
-              echo "::error file=$file::version does not match tag $GITHUB_REF_NAME"
+            if ! grep -q "\"version\": \"$VERSION\"" "$file"; then
+              echo "::error file=$file::version does not match $TAG"
               exit 1
             fi
           done
 
       - name: Extract release notes from CHANGELOG.md
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          awk -v v="$version" '
+          awk -v v="$VERSION" '
             /^## / { if (found) exit; if (index($0, "## " v " ") == 1 || $0 == "## " v) { found = 1; next } }
             found { print }
           ' CHANGELOG.md > notes.md
           if [ ! -s notes.md ]; then
-            echo "::error file=CHANGELOG.md::no section for $version"
+            echo "::error file=CHANGELOG.md::no section for $VERSION"
             exit 1
           fi
 
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" --title "WorkVillage $GITHUB_REF_NAME" --notes-file notes.md --verify-tag
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            gh release create "$TAG" --title "WorkVillage $TAG" --notes-file notes.md --verify-tag
+          else
+            # Creates the tag on the commit this run checked out.
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "WorkVillage $TAG" --notes-file notes.md
+          fi
