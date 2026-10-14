@@ -78,6 +78,7 @@ export const en = {
   'settings.hideVillage': 'Hide the village above the prompt',
   'settings.showVillage': 'Show the village above the prompt',
   'setting.link': 'Settings link',
+  'option.link.panel': 'A small pane of its own',
   'option.link.hint': 'Hint line under the prompt',
   'option.link.top': 'Above the village',
   'option.link.bottom': 'Below the village',

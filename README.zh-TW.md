@@ -62,7 +62,7 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 
 ## 設定
 
-點選輸入框下方提示列尾端的「**WorkVillage 設定**」（可由 `link` 設定改放在村莊上方或下方），或執行 `/village settings`，即可開啟設定面板（亦可在此隱藏或顯示村莊），
+點選 WorkVillage 小面板中的「**設定**」（可由 `link` 設定改放在終端機輸入框下方的提示列，或村莊上方、下方），或執行 `/village settings`，即可開啟設定面板（亦可在此隱藏或顯示村莊），
 變更會立即套用。相同的設定也可在 `/config` 選單的 **workvillage** 項目下調整。
 
 | 設定 | 可用值 | 預設值 |
@@ -70,7 +70,7 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 | `size` | `small`（7 列高）、`medium`（10 列高，並附摘要列）；兩者皆填滿整個寬度 | `small` |
 | `palette` | `color`、`grayscale`、`mono`、`mono-light`、`mono-dark` | `color` |
 | `pixel` | `small`、`medium`、`large`（說明如下） | `small` |
-| `link` | `hint`、`top`、`bottom`、`hidden`（「設定」連結的位置） | `hint` |
+| `link` | `panel`、`hint`、`top`、`bottom`、`hidden`（「設定」連結的位置） | `panel` |
 | `language` | `auto`、`en`、`zh-TW` | `auto`（依 `LC_ALL`、`LC_MESSAGES` 或 `LANG` 判斷） |
 | `animation` | `full`、`reduced`、`off` | `full` |
 

@@ -10,6 +10,8 @@ declare module 'claude-code' {
       isHidden: boolean
       /** Bumped whenever the village changes, so text and vector views redraw. */
       revision: number
+      /** Whether the person closed the settings bar pane this session. */
+      isBarClosed: boolean
     }
   }
 }

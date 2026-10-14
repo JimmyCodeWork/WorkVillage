@@ -22,6 +22,8 @@ import { signalsFor } from '../src/signals'
 
 const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
+/** The small pane of its own that holds the settings link. */
+const BAR_PANE = 'workvillage-bar'
 const SETTINGS_KEY = 'settings'
 const SCENE_KEY = 'village'
 /** Widest band per size, in terminal columns. */
@@ -37,12 +39,14 @@ const VECTOR_CELL_PX = 8
 const PALETTES: readonly Palette[] = ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark']
 
 type PixelSize = 'small' | 'medium' | 'large'
-/** Where the row holding the settings link sits, if anywhere. */
-type LinkPosition = 'hint' | 'top' | 'bottom' | 'hidden'
+const LINK_POSITIONS: readonly LinkPosition[] = ['panel', 'hint', 'top', 'bottom', 'hidden']
+/** Where the settings link sits, if anywhere. */
+type LinkPosition = 'panel' | 'hint' | 'top' | 'bottom' | 'hidden'
 /** CSS pixels per scene pixel on vector surfaces. */
 const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 2, large: 3 }
 
 const isHidden = atom({ plugin: 'workvillage', key: 'isHidden' } as const, false)
+const isBarClosed = atom({ plugin: 'workvillage', key: 'isBarClosed' } as const, false)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
 
 /**
@@ -104,7 +108,7 @@ const rt: Runtime = {
   animation: 'full',
   size: 'small',
   pixel: 'small',
-  linkPosition: 'hint',
+  linkPosition: 'panel',
   palette: 'color',
   hasGraphics: false,
   language: 'auto',
@@ -278,6 +282,8 @@ async function start($: EngineInterface): Promise<void> {
     description: rt.t('command.description'),
     argumentHint: '[show | hide | stats | settings | reset]',
   })
+  // Not awaited: a pane that cannot be placed must not hold up the village.
+  void syncBar($).catch(() => undefined)
   rt.ticker?.cancel()
   rt.ticker = rt.animation === 'off' ? undefined : $.clock.every(rt.animation === 'reduced' ? 1000 : 125, () => tick($))
 }
@@ -305,6 +311,15 @@ async function stop($: EngineInterface): Promise<void> {
 
 async function openSettings($: EngineInterface): Promise<void> {
   await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
+}
+
+/** Opens the settings pane's small pane of its own, unless the person closed it this session. */
+async function syncBar($: EngineInterface): Promise<void> {
+  if (rt.linkPosition === 'panel' && !(await read($, isBarClosed))) {
+    await $.ui.open({ id: BAR_PANE, title: 'WorkVillage', rows: 1 })
+  } else {
+    await $.ui.close({ id: BAR_PANE })
+  }
 }
 
 async function setBandHidden($: EngineInterface, hidden: boolean): Promise<void> {
@@ -359,7 +374,7 @@ export const register: Register = (on, options) => {
   rt.size = options.size === 'medium' ? 'medium' : 'small'
   rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
   rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
-  rt.linkPosition = options.link === 'top' || options.link === 'bottom' || options.link === 'hidden' ? options.link : 'hint'
+  rt.linkPosition = LINK_POSITIONS.find(p => p === options.link) ?? 'panel'
   rt.language = options.language
   rt.options = options
 
@@ -461,7 +476,32 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  // By default the settings link lives on the hint line under the prompt, a
+  on('ui.render', { component: 'Pane', requestId: BAR_PANE }, async ($, e) => {
+    await ensureStarted($)
+    const { t } = rt
+    const hidden = await read($, isHidden)
+    const { Box, Button } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="row" gap={2}>
+        <Button key={SETTINGS_KEY} label={t('settings.open')} plain onPress={() => openSettings($)} />
+        <Button
+          key="visibility"
+          label={t(hidden ? 'settings.showVillage' : 'settings.hideVillage')}
+          plain
+          dimColor
+          onPress={() => setBandHidden($, !hidden)}
+        />
+      </Box>
+    )
+  })
+
+  on('ui.close', async ($, e, next) => {
+    // Remember a close by the person, so the bar stays shut this session.
+    if (e.id === BAR_PANE && e.origin.kind === 'person') await update($, isBarClosed, () => true)
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  // The settings link can also live on the hint line under the prompt, a
   // block of its own, so the village above the prompt keeps its layout.
   on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
     if (rt.linkPosition !== 'hint' || e.props.isDraft || e.props.isWorking) return next(e)

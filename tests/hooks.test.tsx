@@ -92,6 +92,19 @@ const HINT = {
   props: { isDraft: false, isWorking: false, hint: '? for shortcuts' },
 } as const
 
+const BAR_PANE = {
+  component: 'Pane',
+  requestId: 'workvillage-bar',
+  props: {
+    title: 'WorkVillage',
+    isFocused: false,
+    bodyColumns: 80,
+    placement: 'inline',
+    scroll: { offset: 0, bodyRows: 1, contentRows: 0 },
+    view: {},
+  },
+} as const
+
 const SETTINGS_PANE = {
   component: 'Pane',
   requestId: 'workvillage-settings',
@@ -125,16 +138,15 @@ test('the settings button opens a panel that writes the plugin options', async (
   })
 
   await $.session.start({ cwd: '/work/settings', surface: 'terminal', isInteractive: true })
-  // By default the link sits on the hint line under the prompt, not in the village band.
+  // By default the link has a small pane of its own, outside the village band.
+  expect(opened).toContain('workvillage-bar')
   const band = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
   expect(await band.find({ key: 'settings' })).toBeUndefined()
-  const hint = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...HINT })
-  expect(await hint.find({ type: 'Text', text: '? for shortcuts' })).toBeDefined()
-  expect(await hint.find({ type: 'Button', key: 'settings', text: /Settings/ })).toBeDefined()
-  await hint.press({ key: 'settings' })
-  expect(opened).toEqual(['workvillage-settings'])
-  await hint.unmount()
   await band.unmount()
+  const bar = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAR_PANE })
+  await bar.press({ key: 'settings' })
+  expect(opened.at(-1)).toBe('workvillage-settings')
+  await bar.unmount()
 
   const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...SETTINGS_PANE })
   expect((await panel.findAll({ type: 'Select' })).length).toBe(6)
@@ -226,7 +238,7 @@ test('the settings link never joins the village block, at any size', { options: 
   await ui.unmount()
 })
 
-test('the hint line keeps the engine hint and steps aside while typing or working', async ($, on) => {
+test('the hint line keeps the engine hint and steps aside while typing or working', { options: { link: 'hint' } }, async ($, on) => {
   mock.clock(on, { now: 0 })
   mock.store(on)
   mock.env(on, { LANG: 'zh_TW.UTF-8' })
@@ -285,3 +297,28 @@ test('the scene fills a wide band instead of leaving room on the right', async (
   expect(JSON.stringify(await desktop.find({ key: 'village' }))).toMatch(/"alignItems":"center"/)
   await desktop.unmount()
 })
+
+for (const link of ['panel', 'top'] as const) {
+  test(`the settings bar pane is ${link === 'panel' ? 'opened' : 'closed'} when link is ${link}`, { options: { link } }, async ($, on) => {
+    mock.clock(on, { now: 0 })
+    mock.store(on)
+    mock.env(on, { LANG: 'en_US.UTF-8' })
+    on('session.root', () => ({ value: `/work/bar-${link}` }))
+    on('command.register', () => ({ value: { command: 'village' } }))
+    on('session.start', (_$, e) => e)
+    const calls: string[] = []
+    on('ui.open', (_$, e) => {
+      calls.push(`open:${e.id}`)
+      return { value: { isPlaced: true } }
+    })
+    on('ui.close', (_$, e) => {
+      calls.push(`close:${e.id}`)
+      return { value: undefined }
+    })
+
+    await $.session.start({ cwd: `/work/bar-${link}`, surface: 'desktop', isInteractive: true })
+    // The bar is opened without holding up the start: let that call land.
+    for (let i = 0; i < 20 && calls.length === 0; i++) await Promise.resolve()
+    expect(calls).toEqual([link === 'panel' ? 'open:workvillage-bar' : 'close:workvillage-bar'])
+  })
+}
