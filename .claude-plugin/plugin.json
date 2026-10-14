@@ -16,6 +16,27 @@
       "default": "auto",
       "options": ["auto", "en", "zh-TW"]
     },
+    "size": {
+      "type": "string",
+      "title": "Size",
+      "description": "small is a 7-row picture up to 120 columns wide; medium is 10 rows, full width, with a summary line.",
+      "default": "small",
+      "options": ["small", "medium"]
+    },
+    "palette": {
+      "type": "string",
+      "title": "Colours",
+      "description": "color is full colour and grayscale shades of grey. The mono palettes are black-and-white line art: mono follows your terminal's own colours, mono-light is black on white and mono-dark white on black.",
+      "default": "color",
+      "options": ["color", "grayscale", "mono", "mono-light", "mono-dark"]
+    },
+    "pixel": {
+      "type": "string",
+      "title": "Pixel size",
+      "description": "How large each pixel is drawn. small uses half-size pixels in kitty and Ghostty and finer pixels on the desktop; other terminals draw two pixels per character cell at every setting.",
+      "default": "small",
+      "options": ["small", "medium", "large"]
+    },
     "animation": {
       "type": "string",
       "title": "Animation",

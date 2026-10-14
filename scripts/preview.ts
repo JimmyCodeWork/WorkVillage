@@ -89,5 +89,13 @@ for (const [name, signals, frames, hour] of shots) {
   for (let f = 0; f < 12; f++) stepScene(scene, hour >= 20)
   const frame = renderFrame(village, scene, 160, { hour })
   writeFileSync(join(out, `${name}.png`), png(frame, 6))
+  if (name === '04-village') {
+    writeFileSync(join(out, `${name}-small.png`), png(renderFrame(village, scene, 120, { hour }, { height: 14 }), 6))
+    writeFileSync(join(out, `${name}-fine.png`), png(renderFrame(village, scene, 240, { hour }, { height: 16 }), 3))
+    writeFileSync(join(out, `${name}-grayscale.png`), png(renderFrame(village, scene, 120, { hour }, { height: 14, palette: 'grayscale' }), 6))
+    writeFileSync(join(out, `${name}-mono.png`), png(renderFrame(village, scene, 120, { hour }, { height: 14, palette: 'mono' }), 6))
+    writeFileSync(join(out, `${name}-mono-dark.png`), png(renderFrame(village, scene, 120, { hour }, { height: 14, palette: 'mono-dark' }), 6))
+    writeFileSync(join(out, `${name}-mono-medium.png`), png(renderFrame(village, scene, 160, { hour }, { palette: 'mono' }), 6))
+  }
   console.log(name, JSON.stringify(village.resources), 'villagers', village.villagers, 'plots', village.plots.length)
 }

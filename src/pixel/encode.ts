@@ -1,6 +1,11 @@
 import type { Canvas } from './canvas'
 
 const UPPER_HALF_BLOCK = 0x2580
+const LOWER_HALF_BLOCK = 0x2584
+const FULL_BLOCK = 0x2588
+const SPACE = 0x20
+/** The terminal's own default colour, in a Raster cell. */
+const TERMINAL_DEFAULT = 0x01000000
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 /** Standard padded base64; written out so it runs in any JavaScript host. */
@@ -25,9 +30,13 @@ export function toBase64(bytes: Uint8Array): string {
 /**
  * Packs a canvas into terminal Raster cells: each cell is an upper half
  * block, its foreground the upper pixel and its background the lower one,
- * so one cell holds two square pixels.
+ * so one cell holds two square pixels. With `inkOnly`, pixels of that colour
+ * are drawn in the terminal's default foreground and the rest left blank.
  */
-export function toRasterCells(canvas: Canvas): { columns: number; rows: number; cells: string } {
+export function toRasterCells(
+  canvas: Canvas,
+  options: { inkOnly?: number } = {},
+): { columns: number; rows: number; cells: string } {
   const columns = canvas.width
   const rows = Math.ceil(canvas.height / 2)
   const words = new Uint32Array(columns * rows * 3)
@@ -36,6 +45,16 @@ export function toRasterCells(canvas: Canvas): { columns: number; rows: number; 
       const top = canvas.pixels[row * 2 * columns + x] ?? 0
       const bottom = row * 2 + 1 < canvas.height ? (canvas.pixels[(row * 2 + 1) * columns + x] ?? 0) : top
       const at = (row * columns + x) * 3
+      if (options.inkOnly !== undefined) {
+        // Black and white in the terminal's own colours: ink is drawn with
+        // the default foreground, paper left as the default background.
+        const isTop = top === options.inkOnly
+        const isBottom = bottom === options.inkOnly
+        words[at] = isTop ? (isBottom ? FULL_BLOCK : UPPER_HALF_BLOCK) : isBottom ? LOWER_HALF_BLOCK : SPACE
+        words[at + 1] = TERMINAL_DEFAULT
+        words[at + 2] = TERMINAL_DEFAULT
+        continue
+      }
       words[at] = UPPER_HALF_BLOCK
       words[at + 1] = top & 0xffffff
       words[at + 2] = bottom & 0xffffff
@@ -68,4 +87,16 @@ export function toSvg(canvas: Canvas, scale: number): string {
     parts.join('') +
     '</svg>'
   )
+}
+
+/** RGBA bytes, base64, as an Image element's `{ rgba, width, height }` takes them. */
+export function toRgba(canvas: Canvas): { rgba: string; width: number; height: number } {
+  const bytes = new Uint8Array(canvas.width * canvas.height * 4)
+  canvas.pixels.forEach((color, i) => {
+    bytes[i * 4] = (color >> 16) & 255
+    bytes[i * 4 + 1] = (color >> 8) & 255
+    bytes[i * 4 + 2] = color & 255
+    bytes[i * 4 + 3] = 255
+  })
+  return { rgba: toBase64(bytes), width: canvas.width, height: canvas.height }
 }
