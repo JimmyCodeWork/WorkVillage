@@ -23,6 +23,13 @@
       "default": "small",
       "options": ["small", "medium"]
     },
+    "palette": {
+      "type": "string",
+      "title": "Colours",
+      "description": "color is full colour, grayscale shades of grey, mono black-and-white line art (in your terminal's own text colour).",
+      "default": "color",
+      "options": ["color", "grayscale", "mono"]
+    },
     "pixel": {
       "type": "string",
       "title": "Pixel size",

@@ -67,9 +67,20 @@ Change these in the `/config` menu, under **workvillage**.
 | Setting | Values | Default |
 | --- | --- | --- |
 | `size` | `small` (7 rows, up to 120 columns), `medium` (10 rows, full width, with a summary line) | `small` |
+| `palette` | `color`, `grayscale`, `mono` | `color` |
 | `pixel` | `small`, `medium`, `large` (see below) | `small` |
 | `language` | `auto`, `en`, `zh-TW` | `auto` (follows `LC_ALL`, `LC_MESSAGES` or `LANG`) |
 | `animation` | `full`, `reduced`, `off` | `full` |
+
+### Black and white
+
+`palette: mono` draws the village as black-and-white line art. In the terminal it uses your
+terminal's own text and background colours, so it suits light and dark themes alike.
+`palette: grayscale` keeps every shade, in grey.
+
+| `mono` | `grayscale` |
+| --- | --- |
+| ![Mono](docs/images/04-village-mono.png) | ![Grayscale](docs/images/04-village-grayscale.png) |
 
 ## Where it draws
 

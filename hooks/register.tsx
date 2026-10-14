@@ -14,6 +14,7 @@ import {
 } from '../src/core/world'
 import { resolveLocale, translator, type Translate } from '../src/i18n/index'
 import { toRasterCells, toRgba, toSvg } from '../src/pixel/encode'
+import { MONO_INK, type Palette } from '../src/pixel/filter'
 import { FINE_SMALL_HEIGHT, renderFrame, SCENE_HEIGHTS, type SceneSize } from '../src/scene/render'
 import { createScene, enqueue, isBusy, stepScene, syncScene, type Scene } from '../src/scene/sim'
 import { signalsFor } from '../src/signals'
@@ -66,6 +67,7 @@ type Runtime = {
   animation: 'full' | 'reduced' | 'off'
   size: SceneSize
   pixel: PixelSize
+  palette: Palette
   /** The terminal draws pictures (kitty graphics protocol). */
   hasGraphics: boolean
   language: unknown
@@ -85,6 +87,7 @@ const rt: Runtime = {
   animation: 'full',
   size: 'small',
   pixel: 'small',
+  palette: 'color',
   hasGraphics: false,
   language: 'auto',
   t: translator('en'),
@@ -186,7 +189,11 @@ function layout(surface: string, bodyColumns: number, size: SceneSize): Mount {
 }
 
 function frame(mount: Mount, hour = localHour()) {
-  return renderFrame(rt.village, rt.scene, mount.width, { hour }, mount.height)
+  return renderFrame(rt.village, rt.scene, mount.width, { hour }, { height: mount.height, palette: rt.palette })
+}
+
+function rasterCells(canvas: ReturnType<typeof frame>): string {
+  return toRasterCells(canvas, rt.palette === 'mono' ? { inkOnly: MONO_INK } : {}).cells
 }
 
 function tick($: EngineInterface): void {
@@ -199,7 +206,7 @@ function tick($: EngineInterface): void {
     } else if (mount.kind === 'image') {
       void blitImage($, requestId, toRgba(frame(mount, hour)))
     } else {
-      void blitRaster($, requestId, toRasterCells(frame(mount, hour)).cells)
+      void blitRaster($, requestId, rasterCells(frame(mount, hour)))
     }
   }
   // Vector surfaces redraw the whole tree, so they move at a calmer pace.
@@ -289,6 +296,7 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
 export const register: Register = (on, options) => {
   rt.animation = options.animation === 'reduced' || options.animation === 'off' ? options.animation : 'full'
   rt.size = options.size === 'medium' ? 'medium' : 'small'
+  rt.palette = options.palette === 'grayscale' || options.palette === 'mono' ? options.palette : 'color'
   rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
   rt.language = options.language
 
@@ -338,7 +346,7 @@ export const register: Register = (on, options) => {
         mount.kind === 'image' ? (
           <Image key={SCENE_KEY} source={toRgba(frame(mount))} columns={mount.columns} rows={mount.rows} alt=" " />
         ) : (
-          <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={toRasterCells(frame(mount)).cells} />
+          <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={rasterCells(frame(mount))} />
         )
       return (
         <Box flexDirection="column">
@@ -376,7 +384,7 @@ export const register: Register = (on, options) => {
           {mount.kind === 'image' ? (
             <Image key={SCENE_KEY} source={toRgba(frame(mount))} columns={mount.columns} rows={mount.rows} alt=" " />
           ) : (
-            <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={toRasterCells(frame(mount)).cells} />
+            <Raster key={SCENE_KEY} columns={mount.columns} rows={mount.rows} cells={rasterCells(frame(mount))} />
           )}
           {lines.map(line => (
             <Text>{line}</Text>

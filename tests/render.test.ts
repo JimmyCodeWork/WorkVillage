@@ -2,6 +2,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 import { applySignal, createVillage } from '../src/core/world'
 import { toBase64, toRasterCells, toSvg } from '../src/pixel/encode'
+import { MONO_INK, MONO_PAPER } from '../src/pixel/filter'
 import { renderFrame, SCENE_HEIGHTS } from '../src/scene/render'
 import { createScene, enqueue, stepScene, syncScene } from '../src/scene/sim'
 
@@ -25,7 +26,7 @@ describe('render', () => {
 
   test('the small scene is seven rows tall', () => {
     const village = createVillage(1, 0)
-    const raster = toRasterCells(renderFrame(village, createScene(village), 120, { hour: 12 }, SCENE_HEIGHTS.small))
+    const raster = toRasterCells(renderFrame(village, createScene(village), 120, { hour: 12 }, { height: SCENE_HEIGHTS.small }))
     expect(raster.rows).toBe(7)
   })
 
@@ -45,5 +46,25 @@ describe('render', () => {
     expect(scene.holds.has(outcome.action!.plot)).toBe(true)
     for (let i = 0; i < 200; i++) stepScene(scene, false)
     expect(scene.holds.size).toBe(0)
+  })
+})
+
+describe('palettes', () => {
+  const village = createVillage(1, 0)
+
+  test('grayscale leaves only shades of grey', () => {
+    const frame = renderFrame(village, createScene(village), 80, { hour: 12 }, { palette: 'grayscale' })
+    for (const c of frame.pixels) expect(((c >> 16) & 255) === (c & 255) && ((c >> 8) & 255) === (c & 255)).toBe(true)
+  })
+
+  test('mono is pure ink and paper, and draws in the terminal colours', () => {
+    const frame = renderFrame(village, createScene(village), 80, { hour: 23 }, { palette: 'mono' })
+    expect(new Set(frame.pixels)).toEqual(new Set([MONO_INK, MONO_PAPER]))
+    const words = new Uint32Array(Uint8Array.from(atob(toRasterCells(frame, { inkOnly: MONO_INK }).cells), c => c.charCodeAt(0)).buffer)
+    for (let i = 0; i < words.length; i += 3) {
+      expect([0x20, 0x2580, 0x2584, 0x2588]).toContain(words[i])
+      expect(words[i + 1]).toBe(0x01000000)
+      expect(words[i + 2]).toBe(0x01000000)
+    }
   })
 })

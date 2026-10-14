@@ -66,3 +66,23 @@ test('kitty and Ghostty draw half-size pixels as an image', async ($, on) => {
   expect(await ui.find({ type: 'Raster' })).toBeUndefined()
   await ui.unmount()
 })
+
+test('the mono palette draws the band in black and white', { options: { palette: 'mono' } }, async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/mono' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+
+  await $.session.start({ cwd: '/work/mono', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Raster', key: 'village' })).toBeDefined()
+  await ui.unmount()
+
+  const desktop = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
+  const svg = await desktop.find({ type: 'Svg' })
+  expect(JSON.stringify(svg)).toMatch(/#000000/)
+  expect(JSON.stringify(svg)).not.toMatch(/fill=\\?"#(?!000000|ffffff)/)
+  await desktop.unmount()
+})

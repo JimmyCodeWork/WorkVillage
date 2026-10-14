@@ -66,9 +66,19 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 | 設定 | 可用值 | 預設值 |
 | --- | --- | --- |
 | `size` | `small`（7 列高、最寬 120 欄）、`medium`（10 列高、全寬，並附摘要列） | `small` |
+| `palette` | `color`、`grayscale`、`mono` | `color` |
 | `pixel` | `small`、`medium`、`large`（說明如下） | `small` |
 | `language` | `auto`、`en`、`zh-TW` | `auto`（依 `LC_ALL`、`LC_MESSAGES` 或 `LANG` 判斷） |
 | `animation` | `full`、`reduced`、`off` | `full` |
+
+### 黑白模式
+
+`palette` 設為 `mono` 時，村莊以黑白線稿呈現；在終端機中會沿用終端機本身的文字色與背景色，
+因此淺色與深色主題皆適用。設為 `grayscale` 則以灰階保留所有明暗層次。
+
+| `mono` | `grayscale` |
+| --- | --- |
+| ![黑白](docs/images/04-village-mono.png) | ![灰階](docs/images/04-village-grayscale.png) |
 
 ## 顯示位置
 

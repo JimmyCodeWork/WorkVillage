@@ -25,6 +25,7 @@ import { drawVillager, VILLAGER_HEIGHT } from '../art/villager'
 import type { BuildingKind } from '../core/balance'
 import { BUILDINGS } from '../core/balance'
 import { hash01, wildPlot, type Plot, type Village } from '../core/world'
+import { toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
 import { createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
 import { isWorked, plotCenter, PLOT, type Scene } from './sim'
 
@@ -54,6 +55,12 @@ const BUILDING_ART: Readonly<Record<BuildingKind, Sprite>> = {
 export type FrameTime = {
   /** Local hour of day, 0..24, fractional. */
   hour: number
+}
+
+export type FrameStyle = {
+  /** Scene height in pixels. */
+  height?: number
+  palette?: Palette
 }
 
 function drawSky(canvas: Canvas, sky: Sky, tick: number, seed: number, camera: number): void {
@@ -204,10 +211,12 @@ export function renderFrame(
   scene: Scene,
   width: number,
   time: FrameTime,
-  height: number = SCENE_HEIGHTS.medium,
+  style: FrameStyle = {},
 ): Canvas {
-  const sky = skyFor(time.hour)
-  const canvas = createCanvas(width, height)
+  const palette = style.palette ?? 'color'
+  // Line art reads best by daylight; night would turn it to solid ink.
+  const sky = skyFor(palette === 'mono' ? 12 : time.hour)
+  const canvas = createCanvas(width, style.height ?? SCENE_HEIGHTS.medium)
   const GROUND = groundOf(canvas)
   const camera = Math.round(plotCenter(village.camp) - width / 2)
   const tick = scene.tick
@@ -248,6 +257,8 @@ export function renderFrame(
     if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(canvas, fire), { only: P.fireCore })
     for (const { sprite, x, y } of lit) drawSprite(canvas, sprite, x, y, { only: P.window })
   }
+  if (palette === 'grayscale') return toGrayscale(canvas)
+  if (palette === 'mono') return toMonochrome(canvas, background, GROUND)
   return canvas
 }
 
