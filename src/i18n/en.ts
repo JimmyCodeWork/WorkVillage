@@ -1,0 +1,51 @@
+export const en = {
+  'pane.title': 'WorkVillage',
+  'command.description': 'Show your village, its stats, or hide it (show | hide | stats | reset)',
+  'command.shown': 'The village is shown above the prompt.',
+  'command.hidden': 'The village is hidden. Run /village show to bring it back.',
+  'command.opened': 'Opened the village pane.',
+  'command.reset': 'This project’s village has been reset to untouched wilderness.',
+  'command.resetConfirm': 'This clears all progress for this project. Run /village reset confirm to proceed.',
+  'command.usage': 'Usage: /village [show | hide | stats | reset]',
+
+  'stage.camp': 'Camp',
+  'stage.hamlet': 'Hamlet',
+  'stage.village': 'Village',
+  'stage.town': 'Town',
+  'stage.city': 'City',
+
+  'building.tent': 'Tent',
+  'building.hut': 'Hut',
+  'building.well': 'Well',
+  'building.storehouse': 'Storehouse',
+  'building.house': 'House',
+  'building.workshop': 'Workshop',
+  'building.tower': 'Watchtower',
+
+  'resource.wood': 'Timber',
+  'resource.stone': 'Stone',
+  'resource.food': 'Food',
+  'resource.knowledge': 'Knowledge',
+  'resource.villagers': 'Villagers',
+
+  'stat.edits': 'Edits',
+  'stat.reads': 'Reads',
+  'stat.tests': 'Passing test runs',
+  'stat.commits': 'Commits',
+  'stat.tasks': 'Completed tasks',
+  'stat.turns': 'Turns',
+
+  'summary.line': '{stage} · {villagers} villagers · Timber {wood} · Stone {stone} · Food {food}',
+  'summary.next': 'Next: {building} ({wood} timber, {stone} stone)',
+  'summary.building': 'Building: {building} {percent}%',
+  'pane.stats': 'Activity',
+  'pane.resources': 'Resources',
+  'pane.wide': 'Widen the window to see the village.',
+
+  'toast.built': 'WorkVillage: a new {building} has been completed.',
+  'toast.stage': 'WorkVillage: your settlement has grown into a {stage}!',
+  'toast.arrived': 'WorkVillage: a new villager has arrived ({villagers} in total).',
+  'toast.expanded': 'WorkVillage: the clearing has been extended into the forest.',
+
+  'alt.village': 'A pixel-art village: {summary}',
+}

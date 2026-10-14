@@ -1,0 +1,8 @@
+# Written by Claude Code when it loads the mod
+.claude-plugin/types/
+
+# Local tooling
+node_modules/
+preview/
+*.log
+.DS_Store
