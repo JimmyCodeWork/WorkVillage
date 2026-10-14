@@ -87,6 +87,11 @@ test('the mono palette draws the band in black and white', { options: { palette:
   await desktop.unmount()
 })
 
+const HINT = {
+  component: 'PromptHint',
+  props: { isDraft: false, isWorking: false, hint: '? for shortcuts' },
+} as const
+
 const SETTINGS_PANE = {
   component: 'Pane',
   requestId: 'workvillage-settings',
@@ -120,11 +125,15 @@ test('the settings button opens a panel that writes the plugin options', async (
   })
 
   await $.session.start({ cwd: '/work/settings', surface: 'terminal', isInteractive: true })
+  // By default the link sits on the hint line under the prompt, not in the village band.
   const band = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
-  // A plain text link in the corner of the scene opens the settings.
-  expect(await band.find({ type: 'Button', key: 'settings', text: 'Settings' })).toBeDefined()
-  await band.press({ key: 'settings' })
+  expect(await band.find({ key: 'settings' })).toBeUndefined()
+  const hint = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...HINT })
+  expect(await hint.find({ type: 'Text', text: '? for shortcuts' })).toBeDefined()
+  expect(await hint.find({ type: 'Button', key: 'settings', text: /Settings/ })).toBeDefined()
+  await hint.press({ key: 'settings' })
   expect(opened).toEqual(['workvillage-settings'])
+  await hint.unmount()
   await band.unmount()
 
   const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...SETTINGS_PANE })
@@ -141,7 +150,7 @@ test('the settings button opens a panel that writes the plugin options', async (
   await mobile.unmount()
 })
 
-test('the settings link never squeezes the scene', async ($, on) => {
+test('the settings link never squeezes the scene', { options: { link: 'top' } }, async ($, on) => {
   mock.clock(on, { now: 0 })
   mock.store(on)
   mock.env(on, { LANG: 'en_US.UTF-8' })
@@ -199,7 +208,7 @@ for (const [link, order] of [
   })
 }
 
-test('the settings link never joins the village block, at any size', { options: { size: 'medium' } }, async ($, on) => {
+test('the settings link never joins the village block, at any size', { options: { size: 'medium', link: 'top' } }, async ($, on) => {
   mock.clock(on, { now: 0 })
   mock.store(on)
   mock.env(on, { LANG: 'en_US.UTF-8' })
@@ -215,4 +224,29 @@ test('the settings link never joins the village block, at any size', { options: 
   expect(village).not.toMatch(/"key":"settings"/)
   expect(JSON.stringify(await ui.find({ key: 'link' }))).not.toMatch(/Camp/)
   await ui.unmount()
+})
+
+test('the hint line keeps the engine hint and steps aside while typing or working', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'zh_TW.UTF-8' })
+  on('session.root', () => ({ value: '/work/hint' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  // Stands in for the engine's own hint line beneath the plugin.
+  on('ui.render', { component: 'PromptHint' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text key="engine">{e.props.hint}</Text>
+  })
+
+  await $.session.start({ cwd: '/work/hint', surface: 'terminal', isInteractive: true })
+  const idle = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...HINT })
+  expect(await idle.find({ type: 'Button', key: 'settings', text: /設定/ })).toBeDefined()
+  await idle.unmount()
+  for (const props of [{ ...HINT.props, isDraft: true }, { ...HINT.props, isWorking: true }]) {
+    const busy = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', component: 'PromptHint', props })
+    expect(await busy.find({ key: 'settings' })).toBeUndefined()
+    expect(await busy.find({ type: 'Text', text: '? for shortcuts' })).toBeDefined()
+    await busy.unmount()
+  }
 })

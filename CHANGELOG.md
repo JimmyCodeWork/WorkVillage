@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The **WorkVillage Settings** link now sits at the end of the hint line under the prompt by default,
+  outside the village's block (`link: hint`). It steps aside while you type or while a turn runs, and
+  `link` can still put it above or below the village.
+
 ## 0.2.3 - 2026-10-14
 
 - The **Settings** link is a row of its own, apart from the village: at the medium size the summary
