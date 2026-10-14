@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 - 2026-10-14
 
 - The **Settings** link has a row of its own instead of covering the village's corner; at the medium
   size it shares that row with the summary.
