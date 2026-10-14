@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.6 - 2026-10-14
 
 - The resources now sit on a row above the village at every size, with a **Settings** button at its
   right end. The `link` setting, the WorkVillage bar pane and the hint-line link are removed.
