@@ -23,13 +23,13 @@ import { signalsFor } from '../src/signals'
 const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
 const SETTINGS_KEY = 'settings'
-/** Columns the settings button takes beside the scene, its gap included. */
-const BUTTON_COLUMNS = 2
 const SCENE_KEY = 'village'
 /** Widest band per size, in terminal columns. */
 const MAX_COLUMNS: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
 /** Widest vector scene, in scene pixels. */
-const MAX_VECTOR_WIDTH = 200
+const MAX_VECTOR_WIDTH = 320
+/** Roughly how many CSS pixels one column of a vector surface is. */
+const VECTOR_CELL_PX = 8
 
 const PALETTES: readonly Palette[] = ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark']
 
@@ -186,7 +186,9 @@ async function apply($: EngineInterface, signals: readonly Signal[]): Promise<vo
 function layout(surface: string, bodyColumns: number, size: SceneSize): Mount {
   const columns = Math.max(24, Math.min(MAX_COLUMNS[size], Math.floor(bodyColumns)))
   if (surface !== 'terminal') {
-    const width = Math.min(columns, MAX_VECTOR_WIDTH)
+    // Fill the slot at the chosen pixel scale: a wider slot shows more village.
+    const fit = Math.floor((Math.floor(bodyColumns) * VECTOR_CELL_PX) / VECTOR_SCALE[rt.pixel])
+    const width = Math.max(48, Math.min(MAX_VECTOR_WIDTH, fit))
     return { kind: 'vector', width, height: SCENE_HEIGHTS[size], columns: 0, rows: 0 }
   }
   if (rt.pixel === 'small' && rt.hasGraphics) {
@@ -279,6 +281,10 @@ async function openSettings($: EngineInterface): Promise<void> {
   await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
 }
 
+async function setBandHidden($: EngineInterface, hidden: boolean): Promise<void> {
+  await update($, isHidden, () => hidden)
+}
+
 /**
  * Writes one of the plugin's userConfig fields as the /config menu would;
  * the engine then reloads the module with the new options.
@@ -361,7 +367,7 @@ export const register: Register = (on, options) => {
       return next(e)
     }
     const size = rt.size
-    const mount = layout(e.surface, e.props.bodyColumns - BUTTON_COLUMNS, size)
+    const mount = layout(e.surface, e.props.bodyColumns, size)
     // The small band is the picture alone; /village stats has the numbers.
     const withSummary = size === 'medium'
     if (e.surface === 'terminal') {
@@ -379,9 +385,12 @@ export const register: Register = (on, options) => {
         )
       return (
         <Box flexDirection="column">
-          <Box flexDirection="row" gap={1}>
+          <Box key="scene" flexShrink={0}>
             {scene}
-            <Button key={SETTINGS_KEY} label="≡" plain onPress={() => openSettings($)} />
+            {/* A plain text link in the corner, laid over the picture so it takes no room. */}
+            <Box position="absolute" right={0} bottom={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain onPress={() => openSettings($)} />
+            </Box>
           </Box>
           {withSummary && (
             <Text dimColor wrap="truncate-end">
@@ -396,9 +405,16 @@ export const register: Register = (on, options) => {
       rt.mounts.set(e.requestId, mount)
       return (
         <Box flexDirection="column">
-          <Box flexDirection="row" gap={1}>
-            <Svg source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])} alt={rt.t('alt.village', { summary: summary() })} />
-            <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+          <Box key="scene" flexShrink={0}>
+            <Svg
+              source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
+              alt={rt.t('alt.village', { summary: summary() })}
+              width={mount.width * VECTOR_SCALE[rt.pixel]}
+              height={mount.height * VECTOR_SCALE[rt.pixel]}
+            />
+            <Box position="absolute" right={0} bottom={0}>
+              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} plain onPress={() => openSettings($)} />
+            </Box>
           </Box>
           {withSummary && <Text dimColor>{summary()}</Text>}
         </Box>
@@ -441,12 +457,19 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: SETTINGS_PANE }, async ($, e) => {
     const { t } = rt
     const label = (field: SettingField, value: string) => t(`option.${field}.${value}` as Parameters<Translate>[0])
+    const hidden = await read($, isHidden)
+    const visibility = {
+      key: 'visibility',
+      label: t(hidden ? 'settings.showVillage' : 'settings.hideVillage'),
+      onPress: () => setBandHidden($, !hidden),
+    }
     if (e.surface === 'mobile') {
       // No Select on mobile: one Button per choice, the current one marked.
       const { Box, Text, Button } = $.ui.resolve(e)
       return (
         <Box flexDirection="column">
           <Text dimColor>{t('settings.hint')}</Text>
+          <Button {...visibility} />
           {SETTINGS.map(setting => {
             const current = settingValue(setting, rt.options[setting.field])
             return (
@@ -466,10 +489,11 @@ export const register: Register = (on, options) => {
         </Box>
       )
     }
-    const { Box, Text, Select } = $.ui.resolve(e)
+    const { Box, Text, Button, Select } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
         <Text dimColor>{t('settings.hint')}</Text>
+        <Button {...visibility} />
         {SETTINGS.map(setting => (
           <Select
             key={setting.field}

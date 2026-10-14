@@ -75,4 +75,6 @@ export const en = {
   'option.animation.full': 'Full',
   'option.animation.reduced': 'Reduced (once a second)',
   'option.animation.off': 'Off (still picture)',
+  'settings.hideVillage': 'Hide the village above the prompt',
+  'settings.showVillage': 'Show the village above the prompt',
 }

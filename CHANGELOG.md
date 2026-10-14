@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 - 2026-10-14
+
+- The settings button beside the village is now a plain **Settings** link in its bottom-right corner,
+  laid over the picture, so the scene keeps its full width. The settings panel can also hide or show
+  the village.
+- On the desktop the scene fills the available width at the chosen pixel size, instead of a small box.
+
 ## 0.2.0 - 2026-10-14
 
 - A settings button beside the village, and `/village settings`, open a panel for colours, size,
