@@ -67,24 +67,31 @@ function hex(color: number): string {
   return '#' + (color & 0xffffff).toString(16).padStart(6, '0')
 }
 
-/** Renders a canvas as crisp SVG, one rect per horizontal run of a colour. */
+/**
+ * Renders a canvas as crisp SVG: one path per colour, each horizontal run of
+ * that colour a rectangle in it, which keeps wide scenes well under the size
+ * a surface accepts.
+ */
 export function toSvg(canvas: Canvas, scale: number): string {
   const { width, height, pixels } = canvas
-  const parts: string[] = []
+  const runs = new Map<number, string[]>()
   for (let y = 0; y < height; y++) {
     let x = 0
     while (x < width) {
       const color = pixels[y * width + x] ?? 0
       let run = 1
       while (x + run < width && pixels[y * width + x + run] === color) run++
-      parts.push(`<rect x="${x}" y="${y}" width="${run}" height="1" fill="${hex(color)}"/>`)
+      let list = runs.get(color)
+      if (list === undefined) runs.set(color, (list = []))
+      list.push(`M${x} ${y}h${run}v1h-${run}z`)
       x += run
     }
   }
+  const paths = [...runs].map(([color, d]) => `<path fill="${hex(color)}" d="${d.join('')}"/>`)
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" ` +
     `width="${width * scale}" height="${height * scale}" shape-rendering="crispEdges">` +
-    parts.join('') +
+    paths.join('') +
     '</svg>'
   )
 }

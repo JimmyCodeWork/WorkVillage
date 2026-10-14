@@ -22,24 +22,31 @@ import { signalsFor } from '../src/signals'
 
 const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
+/** The small pane of its own that holds the settings link. */
+const BAR_PANE = 'workvillage-bar'
 const SETTINGS_KEY = 'settings'
 const SCENE_KEY = 'village'
 /** Widest band per size, in terminal columns. */
-const MAX_COLUMNS: Readonly<Record<SceneSize, number>> = { small: 120, medium: 240 }
-/** Widest vector scene, in scene pixels. */
-const MAX_VECTOR_WIDTH = 320
+// The scene fills the band's width: the wilderness carries on past the village,
+// so a wider band simply shows more of it. These are the elements' own limits.
+const MAX_RASTER_COLUMNS = 512
+const MAX_IMAGE_COLUMNS = 255
+/** Widest vector scene, in scene pixels; past it the scene is centred. */
+const MAX_VECTOR_WIDTH = 640
 /** Roughly how many CSS pixels one column of a vector surface is. */
 const VECTOR_CELL_PX = 8
 
 const PALETTES: readonly Palette[] = ['color', 'grayscale', 'mono', 'mono-light', 'mono-dark']
 
 type PixelSize = 'small' | 'medium' | 'large'
-/** Where the row holding the settings link sits, if anywhere. */
-type LinkPosition = 'hint' | 'top' | 'bottom' | 'hidden'
+const LINK_POSITIONS: readonly LinkPosition[] = ['panel', 'hint', 'top', 'bottom', 'hidden']
+/** Where the settings link sits, if anywhere. */
+type LinkPosition = 'panel' | 'hint' | 'top' | 'bottom' | 'hidden'
 /** CSS pixels per scene pixel on vector surfaces. */
 const VECTOR_SCALE: Readonly<Record<PixelSize, number>> = { small: 1.5, medium: 2, large: 3 }
 
 const isHidden = atom({ plugin: 'workvillage', key: 'isHidden' } as const, false)
+const isBarClosed = atom({ plugin: 'workvillage', key: 'isBarClosed' } as const, false)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
 
 /**
@@ -86,6 +93,8 @@ type Runtime = {
   village: Village
   scene: Scene
   isReady: boolean
+  /** The start in flight, so a draw that comes first can wait for it. */
+  starting?: Promise<void>
   ticker?: { cancel: () => void }
   saveTimer?: { cancel: () => void }
   mounts: Map<string, Mount>
@@ -99,7 +108,7 @@ const rt: Runtime = {
   animation: 'full',
   size: 'small',
   pixel: 'small',
-  linkPosition: 'hint',
+  linkPosition: 'panel',
   palette: 'color',
   hasGraphics: false,
   language: 'auto',
@@ -175,7 +184,8 @@ function saveNow($: EngineInterface): void {
 }
 
 async function apply($: EngineInterface, signals: readonly Signal[]): Promise<void> {
-  if (!rt.isReady || signals.length === 0) return
+  if (signals.length === 0) return
+  await ensureStarted($)
   for (const signal of signals) {
     const outcome = applySignal(rt.village, signal)
     rt.village = outcome.village
@@ -188,7 +198,7 @@ async function apply($: EngineInterface, signals: readonly Signal[]): Promise<vo
 }
 
 function layout(surface: string, bodyColumns: number, size: SceneSize): Mount {
-  const columns = Math.max(24, Math.min(MAX_COLUMNS[size], Math.floor(bodyColumns)))
+  const columns = Math.max(24, Math.min(MAX_RASTER_COLUMNS, Math.floor(bodyColumns)))
   if (surface !== 'terminal') {
     // Fill the slot at the chosen pixel scale: a wider slot shows more village.
     const fit = Math.floor((Math.floor(bodyColumns) * VECTOR_CELL_PX) / VECTOR_SCALE[rt.pixel])
@@ -198,7 +208,8 @@ function layout(surface: string, bodyColumns: number, size: SceneSize): Mount {
   if (rt.pixel === 'small' && rt.hasGraphics) {
     // Two pixels across and four down per cell: half the size of a raster pixel.
     const height = size === 'small' ? FINE_SMALL_HEIGHT : SCENE_HEIGHTS.medium
-    return { kind: 'image', width: columns * 2, height, columns, rows: height / 4 }
+    const imageColumns = Math.min(columns, MAX_IMAGE_COLUMNS)
+    return { kind: 'image', width: imageColumns * 2, height, columns: imageColumns, rows: height / 4 }
   }
   const height = SCENE_HEIGHTS[size]
   return { kind: 'raster', width: columns, height, columns, rows: height / 2 }
@@ -271,8 +282,25 @@ async function start($: EngineInterface): Promise<void> {
     description: rt.t('command.description'),
     argumentHint: '[show | hide | stats | settings | reset]',
   })
+  // Not awaited: a pane that cannot be placed must not hold up the village.
+  void syncBar($).catch(() => undefined)
   rt.ticker?.cancel()
   rt.ticker = rt.animation === 'off' ? undefined : $.clock.every(rt.animation === 'reduced' ? 1000 : 125, () => tick($))
+}
+
+/**
+ * Starts the module once. A reload (a changed setting, among others) can
+ * reach a draw before session.start runs again; the draw starts it then
+ * instead of drawing nothing until something else redraws the band.
+ */
+async function ensureStarted($: EngineInterface): Promise<void> {
+  if (rt.isReady) return
+  rt.starting ??= start($)
+  try {
+    await rt.starting
+  } finally {
+    rt.starting = undefined
+  }
 }
 
 async function stop($: EngineInterface): Promise<void> {
@@ -283,6 +311,15 @@ async function stop($: EngineInterface): Promise<void> {
 
 async function openSettings($: EngineInterface): Promise<void> {
   await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
+}
+
+/** Opens the settings pane's small pane of its own, unless the person closed it this session. */
+async function syncBar($: EngineInterface): Promise<void> {
+  if (rt.linkPosition === 'panel' && !(await read($, isBarClosed))) {
+    await $.ui.open({ id: BAR_PANE, title: 'WorkVillage', rows: 1 })
+  } else {
+    await $.ui.close({ id: BAR_PANE })
+  }
 }
 
 async function setBandHidden($: EngineInterface, hidden: boolean): Promise<void> {
@@ -301,6 +338,7 @@ async function changeSetting($: EngineInterface, field: SettingField, value: str
 }
 
 async function runCommand($: EngineInterface, args: string): Promise<{ text: string }> {
+  await ensureStarted($)
   const { t } = rt
   const [verb = '', arg = ''] = args.trim().split(/\s+/)
   switch (verb) {
@@ -336,12 +374,12 @@ export const register: Register = (on, options) => {
   rt.size = options.size === 'medium' ? 'medium' : 'small'
   rt.palette = PALETTES.find(p => p === options.palette) ?? 'color'
   rt.pixel = options.pixel === 'medium' || options.pixel === 'large' ? options.pixel : 'small'
-  rt.linkPosition = options.link === 'top' || options.link === 'bottom' || options.link === 'hidden' ? options.link : 'hint'
+  rt.linkPosition = LINK_POSITIONS.find(p => p === options.link) ?? 'panel'
   rt.language = options.language
   rt.options = options
 
   on('session.start', async ($, e, next) => {
-    await start($)
+    await ensureStarted($)
     return next(e)
   })
 
@@ -367,7 +405,8 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     await read($, revision)
-    if (!rt.isReady || e.props.hasSurvey || (await read($, isHidden))) {
+    await ensureStarted($)
+    if (e.props.hasSurvey || (await read($, isHidden))) {
       rt.mounts.delete(e.requestId)
       return next(e)
     }
@@ -421,7 +460,7 @@ export const register: Register = (on, options) => {
       return (
         <Box flexDirection="column">
           {rt.linkPosition === 'top' && link}
-          <Box key="village" flexDirection="column" flexShrink={0}>
+          <Box key="village" flexDirection="column" flexShrink={0} alignItems="center">
             <Svg
               source={toSvg(frame(mount), VECTOR_SCALE[rt.pixel])}
               alt={rt.t('alt.village', { summary: summary() })}
@@ -437,10 +476,36 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  // By default the settings link lives on the hint line under the prompt, a
+  on('ui.render', { component: 'Pane', requestId: BAR_PANE }, async ($, e) => {
+    await ensureStarted($)
+    const { t } = rt
+    const hidden = await read($, isHidden)
+    const { Box, Button } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="row" gap={2}>
+        <Button key={SETTINGS_KEY} label={t('settings.open')} plain onPress={() => openSettings($)} />
+        <Button
+          key="visibility"
+          label={t(hidden ? 'settings.showVillage' : 'settings.hideVillage')}
+          plain
+          dimColor
+          onPress={() => setBandHidden($, !hidden)}
+        />
+      </Box>
+    )
+  })
+
+  on('ui.close', async ($, e, next) => {
+    // Remember a close by the person, so the bar stays shut this session.
+    if (e.id === BAR_PANE && e.origin.kind === 'person') await update($, isBarClosed, () => true)
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  // The settings link can also live on the hint line under the prompt, a
   // block of its own, so the village above the prompt keeps its layout.
   on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
-    if (!rt.isReady || rt.linkPosition !== 'hint' || e.props.isDraft || e.props.isWorking) return next(e)
+    if (rt.linkPosition !== 'hint' || e.props.isDraft || e.props.isWorking) return next(e)
+    await ensureStarted($)
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
     return (
@@ -455,6 +520,7 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     await read($, revision)
+    await ensureStarted($)
     const mount = layout(e.surface, e.props.bodyColumns, 'medium')
     rt.mounts.set(e.requestId, mount)
     const lines = [summary(), progressLine(), statsText()]
