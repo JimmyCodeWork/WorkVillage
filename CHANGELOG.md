@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Fixed: after changing a setting such as the pixel size, the village could vanish until
+  `/village show`. A draw that reaches the reloaded module before `session.start` now starts it.
+- The scene fills the band's whole width at every size, instead of stopping at 120 columns and
+  leaving room on the right; the wilderness simply carries on. On the desktop it fills up to 640 scene
+  pixels and is centred beyond that.
+- SVG output is about three times smaller (one path per colour), which makes room for wider scenes.
+
 ## 0.2.4 - 2026-10-14
 
 - The **WorkVillage Settings** link now sits at the end of the hint line under the prompt by default,

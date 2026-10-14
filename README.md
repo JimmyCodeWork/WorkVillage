@@ -70,7 +70,7 @@ under **workvillage**.
 
 | Setting | Values | Default |
 | --- | --- | --- |
-| `size` | `small` (7 rows, up to 120 columns), `medium` (10 rows, full width, with a summary line) | `small` |
+| `size` | `small` (7 rows), `medium` (10 rows, with a summary line); both fill the band's width | `small` |
 | `palette` | `color`, `grayscale`, `mono`, `mono-light`, `mono-dark` | `color` |
 | `pixel` | `small`, `medium`, `large` (see below) | `small` |
 | `link` | `hint`, `top`, `bottom`, `hidden` (where the Settings link sits) | `hint` |

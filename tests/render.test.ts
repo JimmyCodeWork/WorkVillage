@@ -33,9 +33,11 @@ describe('render', () => {
   test('svg stays within the size a surface accepts', () => {
     let village = createVillage(1, 0)
     for (let i = 0; i < 300; i++) village = applySignal(village, i % 7 === 6 ? 'commit' : i % 3 ? 'edit' : 'test').village
-    for (const hour of [12, 22]) {
-      const svg = toSvg(renderFrame(village, createScene(village), 320, { hour }), 3)
-      expect(svg.length).toBeLessThan(131072)
+    for (const hour of [12, 18.5, 22]) {
+      for (const palette of ['color', 'mono'] as const) {
+        const svg = toSvg(renderFrame(village, createScene(village), 640, { hour }, { palette }), 3)
+        expect(svg.length).toBeLessThan(131072)
+      }
     }
   })
 
@@ -75,5 +77,23 @@ describe('palettes', () => {
       expect(words[i + 1]).toBe(0x01000000)
       expect(words[i + 2]).toBe(0x01000000)
     }
+  })
+})
+
+describe('svg', () => {
+  test('the paths redraw exactly the frame they encode', () => {
+    let village = createVillage(3, 0)
+    for (let i = 0; i < 200; i++) village = applySignal(village, i % 5 ? 'edit' : 'test').village
+    const frame = renderFrame(village, createScene(village), 300, { hour: 12 })
+    const svg = toSvg(frame, 2)
+    const drawn = new Int32Array(frame.width * frame.height).fill(-1)
+    for (const path of svg.matchAll(/<path fill="#([0-9a-f]{6})" d="([^"]+)"\/>/g)) {
+      const color = parseInt(path[1]!, 16)
+      for (const run of path[2]!.matchAll(/M(\d+) (\d+)h(\d+)v1h-\d+z/g)) {
+        const [x, y, w] = [Number(run[1]), Number(run[2]), Number(run[3])]
+        for (let i = 0; i < w; i++) drawn[y * frame.width + x + i] = color
+      }
+    }
+    expect([...drawn]).toEqual([...frame.pixels].map(c => c & 0xffffff))
   })
 })

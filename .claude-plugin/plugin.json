@@ -19,7 +19,7 @@
     "size": {
       "type": "string",
       "title": "Size",
-      "description": "small is a 7-row picture up to 120 columns wide; medium is 10 rows, full width, with a summary line.",
+      "description": "small is a 7-row picture; medium is 10 rows with a summary line. Both fill the width of the band.",
       "default": "small",
       "options": ["small", "medium"]
     },

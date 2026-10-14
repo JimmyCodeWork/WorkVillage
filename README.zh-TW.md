@@ -67,7 +67,7 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 
 | 設定 | 可用值 | 預設值 |
 | --- | --- | --- |
-| `size` | `small`（7 列高、最寬 120 欄）、`medium`（10 列高、全寬，並附摘要列） | `small` |
+| `size` | `small`（7 列高）、`medium`（10 列高，並附摘要列）；兩者皆填滿整個寬度 | `small` |
 | `palette` | `color`、`grayscale`、`mono`、`mono-light`、`mono-dark` | `color` |
 | `pixel` | `small`、`medium`、`large`（說明如下） | `small` |
 | `link` | `hint`、`top`、`bottom`、`hidden`（「設定」連結的位置） | `hint` |

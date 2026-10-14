@@ -250,3 +250,38 @@ test('the hint line keeps the engine hint and steps aside while typing or workin
     await busy.unmount()
   }
 })
+
+test('a draw that comes before session.start still shows the village', async ($, on) => {
+  // What a reload after a settings change can look like: the band is drawn
+  // by the fresh module before session.start reaches it.
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/reload' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+
+  const ui = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Raster', key: 'village' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the scene fills a wide band instead of leaving room on the right', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/wide' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+
+  await $.session.start({ cwd: '/work/wide', surface: 'terminal', isInteractive: true })
+  const wide = { ...BAND, props: { ...BAND.props, bodyColumns: 200 } }
+  const terminal = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...wide })
+  expect(/"columns":(\d+)/.exec(JSON.stringify(await terminal.find({ type: 'Raster' })))?.[1]).toBe('200')
+  await terminal.unmount()
+
+  const desktop = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...wide })
+  const svg = JSON.stringify(await desktop.find({ type: 'Svg' }))
+  expect(Number(/"width":(\d+(?:\.\d+)?)/.exec(svg)?.[1])).toBe(960)
+  expect(JSON.stringify(await desktop.find({ key: 'village' }))).toMatch(/"alignItems":"center"/)
+  await desktop.unmount()
+})
