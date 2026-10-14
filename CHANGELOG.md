@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.6 - 2026-10-14
+
+- Reading and thinking now grow the village. A read sends a villager to read by the fire, and a
+  response in which Claude thought first (or a task handed to a subagent) has one ponder there, with
+  a spark of an idea. Both add knowledge, and every 4 knowledge becomes a planned step on the
+  building under way. `/village stats` counts thoughts.
+- The resources now sit on a row above the village at every size, with a **Settings** button at its
+  right end. The `link` setting, the WorkVillage bar pane and the hint-line link are removed.
+- Fixed: the settings pane flickered on the desktop. The scene's animation redrew everything the
+  plugin drew; it now redraws only the scene.
+
 ## 0.2.5 - 2026-10-14
 
 - Fixed: after changing a setting such as the pixel size, the village could vanish until

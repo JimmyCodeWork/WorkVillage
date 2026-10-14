@@ -74,3 +74,39 @@ describe('world', () => {
     expect(restore('village')).toBeUndefined()
   })
 })
+
+describe('reading and thinking', () => {
+  test('reading is studied by the fire, thinking pondered, both add knowledge', () => {
+    const v = createVillage(1, 0)
+    const read = applySignal(v, 'read')
+    expect(read.action?.kind).toBe('study')
+    expect(read.village.resources.knowledge).toBe(1)
+    const think = applySignal(read.village, 'think')
+    expect(think.action?.kind).toBe('ponder')
+    expect(think.village.resources.knowledge).toBe(3)
+    expect(think.village.stats.thoughts).toBe(1)
+  })
+
+  test('enough knowledge becomes a planned step on the building under way', () => {
+    let v = createVillage(7, 0)
+    // Work until a building site is placed.
+    for (let i = 0; i < 40 && !v.plots.some(p => p.kind === 'building'); i++) v = applySignal(v, 'edit').village
+    const index = v.plots.findIndex(p => p.kind === 'building')
+    expect(index).toBeGreaterThan(-1)
+    const before = v.plots[index]
+    v = { ...v, resources: { ...v.resources, knowledge: 4 } }
+    const outcome = applySignal(v, 'think')
+    expect(outcome.action?.kind).toBe('build')
+    const after = outcome.village.plots[index]
+    if (before?.kind === 'building' && after?.kind === 'building') expect(after.progress).toBe(before.progress + 1)
+    expect(outcome.village.resources.knowledge).toBe(2)
+  })
+
+  test('villages saved before thoughts were counted still load', () => {
+    const v = createVillage(1, 0)
+    const { thoughts: _, ...old } = v.stats
+    const restored = restore(JSON.parse(JSON.stringify({ ...v, stats: old })))
+    expect(restored?.stats.thoughts).toBe(0)
+    expect(applySignal(restored!, 'think').village.stats.thoughts).toBe(1)
+  })
+})

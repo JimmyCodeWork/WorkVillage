@@ -39,7 +39,10 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 | --- | --- |
 | 編輯檔案 | 伐木或清除樹樁以取得**木材**，或推進目前的建設 |
 | 新增檔案 | 開採岩石以取得**石材** |
-| 讀取或搜尋檔案 | 累積**知識**，並不時採集糧食 |
+| 讀取或搜尋檔案 | 在營火旁閱讀，累積**知識**，並不時採集糧食 |
+| Claude 回答前先思考，或將工作交給子代理 | 在營火旁沉思，累積更多**知識** |
+
+每累積 4 點知識，就會轉為目前建設的一個施工階段；因此閱讀與思考同樣能推動村莊發展。
 | 測試通過 | 播種、澆水與收成，取得**糧食** |
 | `git commit` 成功 | 里程碑：大幅推進目前的建設 |
 | 完成待辦事項或任務 | 若有空房，將有新村民加入 |
@@ -62,15 +65,14 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 
 ## 設定
 
-點選 WorkVillage 小面板中的「**設定**」（可由 `link` 設定改放在終端機輸入框下方的提示列，或村莊上方、下方），或執行 `/village settings`，即可開啟設定面板（亦可在此隱藏或顯示村莊），
+村莊上方一列顯示資源，最右側為「**設定**」按鈕；點選該按鈕或執行 `/village settings`，即可開啟設定面板（亦可在此隱藏或顯示村莊），
 變更會立即套用。相同的設定也可在 `/config` 選單的 **workvillage** 項目下調整。
 
 | 設定 | 可用值 | 預設值 |
 | --- | --- | --- |
-| `size` | `small`（7 列高）、`medium`（10 列高，並附摘要列）；兩者皆填滿整個寬度 | `small` |
+| `size` | `small`（7 列高）、`medium`（10 列高）；兩者皆填滿整個寬度，並位於資源列下方 | `small` |
 | `palette` | `color`、`grayscale`、`mono`、`mono-light`、`mono-dark` | `color` |
 | `pixel` | `small`、`medium`、`large`（說明如下） | `small` |
-| `link` | `panel`、`hint`、`top`、`bottom`、`hidden`（「設定」連結的位置） | `panel` |
 | `language` | `auto`、`en`、`zh-TW` | `auto`（依 `LC_ALL`、`LC_MESSAGES` 或 `LANG` 判斷） |
 | `animation` | `full`、`reduced`、`off` | `full` |
 

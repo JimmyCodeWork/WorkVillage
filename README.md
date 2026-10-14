@@ -39,7 +39,11 @@ Requires Claude Code 2.1.275 or later.
 | --- | --- |
 | A file is edited | Fell a tree or clear a stump for **timber**, or work on the current building |
 | A new file is written | Quarry a boulder for **stone** |
-| Files are read or searched | Gather **knowledge**; now and then forage for food |
+| Files are read or searched | Read by the fire for **knowledge**; now and then forage for food |
+| Claude thinks before answering, or hands work to a subagent | Ponder by the fire for more **knowledge** |
+
+Every 4 knowledge becomes a planned step on the building under way, so reading and thinking help
+the village grow too.
 | A test run passes | Plant, water and harvest fields for **food** |
 | A `git commit` succeeds | A milestone: a big push on the current building |
 | A to-do or task is completed | A new villager arrives, if there is a home for them |
@@ -63,17 +67,15 @@ Failed tool calls never cost you anything: the village only ever grows.
 
 ## Settings
 
-Click **Settings** in the small WorkVillage pane (the `link` setting can move the link to the hint line
-under the prompt in a terminal, or above or below the village instead), or run `/village settings`, to open the
-settings panel. It can also hide or show the village above the prompt. Changes apply at once. The same settings are also in the `/config` menu,
+The row above the village shows its resources, with a **Settings** button at its right end. Press it,
+or run `/village settings`, to open the settings panel. It can also hide or show the village above the prompt. Changes apply at once. The same settings are also in the `/config` menu,
 under **workvillage**.
 
 | Setting | Values | Default |
 | --- | --- | --- |
-| `size` | `small` (7 rows), `medium` (10 rows, with a summary line); both fill the band's width | `small` |
+| `size` | `small` (7 rows), `medium` (10 rows); both fill the band's width, under the resources row | `small` |
 | `palette` | `color`, `grayscale`, `mono`, `mono-light`, `mono-dark` | `color` |
 | `pixel` | `small`, `medium`, `large` (see below) | `small` |
-| `link` | `panel`, `hint`, `top`, `bottom`, `hidden` (where the Settings link sits) | `panel` |
 | `language` | `auto`, `en`, `zh-TW` | `auto` (follows `LC_ALL`, `LC_MESSAGES` or `LANG`) |
 | `animation` | `full`, `reduced`, `off` | `full` |
 

@@ -29,6 +29,8 @@ export type Stats = {
   tasks: number
   turns: number
   actions: number
+  /** Responses in which the model thought before answering. */
+  thoughts: number
 }
 
 export type Village = {
@@ -45,7 +47,7 @@ export type Village = {
   createdAt: number
 }
 
-export type Signal = 'edit' | 'create' | 'read' | 'test' | 'commit' | 'task' | 'turn'
+export type Signal = 'edit' | 'create' | 'read' | 'think' | 'test' | 'commit' | 'task' | 'turn'
 
 export type ActionKind =
   | 'chop'
@@ -58,6 +60,8 @@ export type ActionKind =
   | 'forage'
   | 'arrive'
   | 'celebrate'
+  | 'study'
+  | 'ponder'
 
 /** What a villager should be seen doing for a signal. */
 export type Action = {
@@ -115,7 +119,7 @@ export function createVillage(seed: number, now: number): Village {
     camp: half,
     villagers: 1,
     resources: { wood: 0, stone: 0, food: 0, knowledge: 0 },
-    stats: { edits: 0, reads: 0, tests: 0, commits: 0, tasks: 0, turns: 0, actions: 0 },
+    stats: { edits: 0, reads: 0, tests: 0, commits: 0, tasks: 0, turns: 0, actions: 0, thoughts: 0 },
     nextBuild: 0,
     createdAt: now,
   }
@@ -323,6 +327,21 @@ function farming(village: Village, milestones: Milestone[]): Outcome {
   return { village: gain(v, { food: 1 }), action: forageAction(v), milestones }
 }
 
+/**
+ * Reading and thinking add knowledge; enough of it turns into a planned step
+ * on the building under way. Without one, a villager studies or ponders by
+ * the fire and the knowledge waits for the next site.
+ */
+function learning(village: Village, kind: 'study' | 'ponder', milestones: Milestone[]): Outcome {
+  const at = site(village)
+  if (at !== undefined && village.resources.knowledge >= REWARDS.knowledgePerStep) {
+    const before = village.plots[at]
+    const v = build(gain(village, { knowledge: -REWARDS.knowledgePerStep }), at, 1, milestones)
+    return { village: v, action: { kind: 'build', plot: at, before }, milestones }
+  }
+  return { village, action: { kind, plot: village.camp, before: undefined }, milestones }
+}
+
 function arrival(village: Village, milestones: Milestone[]): Village {
   if (village.villagers >= capacity(village)) return village
   const villagers = village.villagers + 1
@@ -340,12 +359,17 @@ export function applySignal(village: Village, signal: Signal): Outcome {
       outcome = labour(count(village, 'edits'), signal === 'create', milestones)
       break
     case 'read': {
-      let v = gain(count(village, 'reads'), { knowledge: 1 })
-      const forage = v.stats.reads % REWARDS.readsPerForage === 0
-      if (forage) v = gain(v, { food: 1 })
-      outcome = { village: v, action: forage ? forageAction(v) : undefined, milestones }
+      const v = gain(count(village, 'reads'), { knowledge: REWARDS.readKnowledge })
+      if (v.stats.reads % REWARDS.readsPerForage === 0) {
+        outcome = { village: gain(v, { food: 1 }), action: forageAction(v), milestones }
+      } else {
+        outcome = learning(v, 'study', milestones)
+      }
       break
     }
+    case 'think':
+      outcome = learning(gain(count(village, 'thoughts'), { knowledge: REWARDS.thinkKnowledge }), 'ponder', milestones)
+      break
     case 'test':
       outcome = farming(count(village, 'tests'), milestones)
       break
@@ -403,5 +427,7 @@ export function restore(value: unknown): Village | undefined {
   if (typeof value !== 'object' || value === null) return undefined
   const v = value as Partial<Village>
   if (v.version !== 1 || !Array.isArray(v.plots) || typeof v.camp !== 'number') return undefined
-  return v as Village
+  // Villages saved before a counter existed start it at zero.
+  const stats = { edits: 0, reads: 0, tests: 0, commits: 0, tasks: 0, turns: 0, actions: 0, thoughts: 0, ...v.stats }
+  return { ...(v as Village), stats }
 }

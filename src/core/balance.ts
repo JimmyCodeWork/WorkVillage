@@ -44,6 +44,10 @@ export const REWARDS = {
   harvestFood: 4,
   ripeAt: 3,
   readsPerForage: 3,
+  readKnowledge: 1,
+  thinkKnowledge: 2,
+  /** Knowledge spent on one planned step of the building under way. */
+  knowledgePerStep: 4,
   commitBuildSteps: 3,
   commitWood: 2,
   commitStone: 2,

@@ -52,6 +52,8 @@ const WORK_TICKS: Record<ActionKind, number> = {
   forage: 10,
   arrive: 0,
   celebrate: 16,
+  study: 24,
+  ponder: 18,
 }
 
 /** Offset from a villager's box to its feet, for standing beside a plot. */
@@ -162,6 +164,10 @@ function workPose(kind: ActionKind, beat: boolean): Pose {
     case 'harvest':
     case 'forage':
       return 'kneel'
+    case 'study':
+      return 'read'
+    case 'ponder':
+      return beat ? 'ponder1' : 'ponder2'
     default:
       return 'stand'
   }

@@ -32,6 +32,7 @@ export const zhTW: Messages = {
 
   'stat.edits': '編輯次數',
   'stat.reads': '讀取次數',
+  'stat.thoughts': '思考次數',
   'stat.tests': '測試通過次數',
   'stat.commits': '提交次數',
   'stat.tasks': '已完成任務',
@@ -67,7 +68,7 @@ export const zhTW: Messages = {
   'option.palette.mono-light': '黑白・明亮',
   'option.palette.mono-dark': '黑白・暗色',
   'option.size.small': '小（7 列）',
-  'option.size.medium': '中（10 列，附摘要）',
+  'option.size.medium': '中（10 列）',
   'option.pixel.small': '小',
   'option.pixel.medium': '中',
   'option.pixel.large': '大',
@@ -79,10 +80,4 @@ export const zhTW: Messages = {
   'option.animation.off': '關閉（靜態畫面）',
   'settings.hideVillage': '隱藏輸入框上方的村莊',
   'settings.showVillage': '顯示輸入框上方的村莊',
-  'setting.link': '設定連結位置',
-  'option.link.panel': '獨立的小面板',
-  'option.link.hint': '輸入框下方的提示列',
-  'option.link.top': '村莊上方',
-  'option.link.bottom': '村莊下方',
-  'option.link.hidden': '隱藏（改用 /village settings）',
 }

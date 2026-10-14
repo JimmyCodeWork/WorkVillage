@@ -30,6 +30,7 @@ export const en = {
 
   'stat.edits': 'Edits',
   'stat.reads': 'Reads',
+  'stat.thoughts': 'Thoughts',
   'stat.tests': 'Passing test runs',
   'stat.commits': 'Commits',
   'stat.tasks': 'Completed tasks',
@@ -65,7 +66,7 @@ export const en = {
   'option.palette.mono-light': 'Black and white, light',
   'option.palette.mono-dark': 'Black and white, dark',
   'option.size.small': 'Small (7 rows)',
-  'option.size.medium': 'Medium (10 rows, with summary)',
+  'option.size.medium': 'Medium (10 rows)',
   'option.pixel.small': 'Small',
   'option.pixel.medium': 'Medium',
   'option.pixel.large': 'Large',
@@ -77,10 +78,4 @@ export const en = {
   'option.animation.off': 'Off (still picture)',
   'settings.hideVillage': 'Hide the village above the prompt',
   'settings.showVillage': 'Show the village above the prompt',
-  'setting.link': 'Settings link',
-  'option.link.panel': 'A small pane of its own',
-  'option.link.hint': 'Hint line under the prompt',
-  'option.link.top': 'Above the village',
-  'option.link.bottom': 'Below the village',
-  'option.link.hidden': 'Hidden (use /village settings)',
 }

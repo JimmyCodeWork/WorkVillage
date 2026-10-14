@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { isCommitCommand, isTestCommand, signalsFor } from '../src/signals'
+import { hasThinking, isCommitCommand, isTestCommand, signalsFor } from '../src/signals'
 
 describe('signals', () => {
   test('edits, new files and reads', () => {
@@ -50,5 +50,13 @@ describe('signals', () => {
     expect(signalsFor('TodoWrite', { todos: newTodos }, { oldTodos, newTodos })).toEqual(['task', 'task'])
     expect(signalsFor('TaskUpdate', { status: 'completed' }, { success: true, statusChange: { from: 'in_progress', to: 'completed' } })).toEqual(['task'])
     expect(signalsFor('TaskUpdate', { status: 'pending' }, { success: true })).toEqual([])
+  })
+
+  test('thinking and planning', () => {
+    expect(signalsFor('Agent', {}, {})).toEqual(['think'])
+    expect(hasThinking('response', [{ type: 'thinking', thinking: '…' }])).toBe(true)
+    expect(hasThinking('response', [{ type: 'redacted_thinking' }])).toBe(true)
+    expect(hasThinking('response', [{ type: 'text', text: 'hi' }])).toBe(false)
+    expect(hasThinking('prompt', [{ type: 'thinking' }])).toBe(false)
   })
 })
