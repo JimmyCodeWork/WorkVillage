@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.8 - 2026-10-15
 
 - Fixed: on the desktop the **Settings** button flickered with the scene's animation. The scene now
   holds still while the pointer rests on the button (the button is drawn by a small client module
