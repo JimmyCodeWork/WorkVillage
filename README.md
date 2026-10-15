@@ -152,8 +152,9 @@ as the code. It is not derived from any other game or asset pack.
 
 ## Support
 
-If you enjoy WorkVillage, you can [support its development on Ko-fi](https://ko-fi.com/toolmanjimmy).
-Thank you for helping the village grow!
+If you enjoy WorkVillage, you can support its development on Ko-fi. Thank you for helping the village grow!
+
+<a href="https://ko-fi.com/toolmanjimmy" target="_blank"><img height="36" style="border:0px;height:36px;" src="https://storage.ko-fi.com/cdn/kofi2.png?v=6" border="0" alt="Buy Me a Coffee at ko-fi.com" /></a>
 
 ## License
 

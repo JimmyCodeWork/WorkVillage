@@ -145,8 +145,9 @@ WorkVillage 的所有像素美術皆為本專案原創繪製，並以與程式�
 
 ## 贊助
 
-如果你喜歡 WorkVillage，歡迎[透過 Ko-fi 支持開發](https://ko-fi.com/toolmanjimmy)。
-感謝你幫助村莊持續成長！
+如果你喜歡 WorkVillage，歡迎透過 Ko-fi 支持開發。感謝你幫助村莊持續成長！
+
+<a href="https://ko-fi.com/toolmanjimmy" target="_blank"><img height="36" style="border:0px;height:36px;" src="https://storage.ko-fi.com/cdn/kofi2.png?v=6" border="0" alt="在 ko-fi.com 請我喝杯咖啡" /></a>
 
 ## 授權
 
