@@ -143,6 +143,11 @@ bun scripts/preview.ts docs/images   # 產生預覽圖
 WorkVillage 的所有像素美術皆為本專案原創繪製，並以與程式碼相同的授權釋出，
 未衍生自任何其他遊戲或素材包。
 
+## 贊助
+
+如果你喜歡 WorkVillage，歡迎[透過 Ko-fi 支持開發](https://ko-fi.com/toolmanjimmy)。
+感謝你幫助村莊持續成長！
+
 ## 授權
 
 [MIT](LICENSE)

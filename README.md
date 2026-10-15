@@ -150,6 +150,11 @@ The source is laid out as follows:
 All pixel art in WorkVillage was drawn for this project and is released under the same licence
 as the code. It is not derived from any other game or asset pack.
 
+## Support
+
+If you enjoy WorkVillage, you can [support its development on Ko-fi](https://ko-fi.com/toolmanjimmy).
+Thank you for helping the village grow!
+
 ## License
 
 [MIT](LICENSE)
