@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Fixed: on the desktop the **Settings** button flickered with the scene's animation. The scene now
+  holds still while the pointer rests on the button (the button is drawn by a small client module
+  that reports the pointer entering and leaving it); a plain button stands in where a surface cannot
+  run that module.
+
 ## 0.2.7 - 2026-10-14
 
 - Fixed: a choice in the settings pane could snap back and not take effect. Choices now apply at once

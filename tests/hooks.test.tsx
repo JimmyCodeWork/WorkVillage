@@ -131,7 +131,13 @@ test('the resources row above the village holds the settings button', async ($, 
     expect(header).toMatch(/"key":"settings"/)
     // A button, not a plain text link.
     expect(JSON.stringify(await band.find({ key: 'settings' }))).not.toMatch(/"plain":true/)
-    await band.press({ key: 'settings' })
+    if (surface === 'terminal') {
+      await band.press({ key: 'settings' })
+    } else {
+      // On the desktop the button is a Client, so it can tell when the pointer rests on it.
+      expect(JSON.stringify(await band.find({ key: 'settings' }))).toMatch(/settings-button/)
+      await band.press({ key: 'open', in: 'settings' } as never)
+    }
     expect(opened.at(-1)).toBe('workvillage-settings')
     await band.unmount()
   }
@@ -276,7 +282,7 @@ test('the scene holds still while the settings pane is open', async ($, on) => {
   await clock.advance(2000)
   expect(frames).toBeGreaterThan(0)
 
-  await band.press({ key: 'settings' })
+  await band.post({ type: 'open' }, { in: 'settings' })
   const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...SETTINGS_PANE })
   const before = frames
   await clock.advance(2000)
@@ -287,5 +293,34 @@ test('the scene holds still while the settings pane is open', async ($, on) => {
   await clock.advance(2000)
   expect(frames).toBeGreaterThan(before)
   await panel.unmount()
+  await band.unmount()
+})
+
+test('the scene holds still while the pointer rests on the Settings button', async ($, on) => {
+  const clock = mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/hover' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  let frames = 0
+  on('state.set', (_$, e, next) => {
+    if ((e as { key?: string }).key === 'frame') frames++
+    return next(e)
+  })
+
+  await $.session.start({ cwd: '/work/hover', surface: 'desktop', isInteractive: true })
+  const band = await $.ui.mount({ plugin: 'workvillage', surface: 'desktop', ...BAND })
+  await clock.advance(2000)
+  expect(frames).toBeGreaterThan(0)
+
+  await band.pointer({ type: 'enter', x: 1, y: 0, in: 'settings' })
+  const before = frames
+  await clock.advance(2000)
+  expect(frames).toBe(before)
+
+  await band.pointer({ type: 'leave', x: 1, y: 0, in: 'settings' })
+  await clock.advance(2000)
+  expect(frames).toBeGreaterThan(before)
   await band.unmount()
 })
