@@ -108,6 +108,10 @@ type Runtime = {
   locales: readonly (string | undefined)[]
   /** While the settings pane is open the vector scene holds still. */
   isSettingsOpen: boolean
+  /** So does it while the pointer rests on the Settings button. */
+  isPointerOnSettings: boolean
+  /** Surfaces where the Settings button's Client failed; a plain Button stands in. */
+  clientFaults: Set<string>
 }
 
 // The module's own state: rebuilt from $.store at each session.start, so a
@@ -128,6 +132,8 @@ const rt: Runtime = {
   options: {},
   locales: [],
   isSettingsOpen: false,
+  isPointerOnSettings: false,
+  clientFaults: new Set(),
 }
 
 function summary(): string {
@@ -248,7 +254,8 @@ function tick($: EngineInterface): void {
   }
   // Vector surfaces redraw the whole scene, so they move at a calmer pace.
   // It holds still while the settings pane is open, so nothing redraws under a choice being made.
-  if (hasVector && !rt.isSettingsOpen && (rt.scene.tick % 4 === 0 || isBusy(rt.scene))) {
+  const isHeld = rt.isSettingsOpen || rt.isPointerOnSettings
+  if (hasVector && !isHeld && (rt.scene.tick % 4 === 0 || isBusy(rt.scene))) {
     void update($, animationFrame, n => n + 1)
   }
 }
@@ -337,6 +344,7 @@ async function stop($: EngineInterface): Promise<void> {
 
 async function openSettings($: EngineInterface): Promise<void> {
   rt.isSettingsOpen = true
+  rt.isPointerOnSettings = false
   await $.ui.open({ id: SETTINGS_PANE, title: rt.t('settings.title') })
 }
 
@@ -480,7 +488,7 @@ export const register: Register = (on, options) => {
     }
     if (e.surface === 'desktop') {
       await read($, animationFrame)
-      const { Box, Text, Button, Svg } = $.ui.resolve(e)
+      const { Box, Text, Button, Svg, Client } = $.ui.resolve(e)
       rt.mounts.set(e.requestId, mount)
       return (
         <Box flexDirection="column">
@@ -489,7 +497,11 @@ export const register: Register = (on, options) => {
               <Text dimColor>{summary()}</Text>
             </Box>
             <Box flexShrink={0}>
-              <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+              {rt.clientFaults.has(e.surface) ? (
+                <Button key={SETTINGS_KEY} label={rt.t('settings.open')} onPress={() => openSettings($)} />
+              ) : (
+                <Client key={SETTINGS_KEY} module="./settings-button.tsx" props={{ label: rt.t('settings.open') }} />
+              )}
             </Box>
           </Box>
           <Box key="village" flexShrink={0} alignItems="center">
@@ -538,6 +550,20 @@ export const register: Register = (on, options) => {
       </Box>
     )
   })
+
+  on('ui.message', async ($, e, next) => {
+    if (e.element !== SETTINGS_KEY) return next(e)
+    const data = (e.data ?? {}) as { type?: unknown; on?: unknown }
+    if (data.type === 'hover') rt.isPointerOnSettings = data.on === true
+    if (data.type === 'open') await openSettings($)
+    return {}
+  })
+
+  on('ui.fault', async ($, e, next) => {
+    // The surface could not run the button's Client: draw a plain Button there instead.
+    if (e.element === SETTINGS_KEY) rt.clientFaults.add(e.surface)
+    return next(e)
+  }).catch(($, e, next) => next(e))
 
   on('ui.close', async ($, e, next) => {
     if (e.id === SETTINGS_PANE) rt.isSettingsOpen = false
