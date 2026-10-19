@@ -8,6 +8,14 @@
   previewed, and changes nothing until it is confirmed; **Undo import** puts back what it replaced.
 - A lifetime record now adds up the work of every project on the device. `/village stats` shows it
   under the project's own counts. Resetting a village keeps the work it recorded.
+- Villagers see each job through. Felling a tree takes many blows, with chips of wood flying, then
+  the tree falls away from the axe and is cut to length; a boulder is struck until it cracks and then
+  broken up. Work speeds up while jobs queue, so the scene keeps pace with a busy session.
+- Villagers with nothing to do lend a hand: two fell a tree, up to three raise a building or bring in
+  a harvest. A helper carries the timber home, and a villager walking back empty-handed takes the next
+  job straight away instead of first returning to the fire. Once a storehouse stands, timber and
+  stone are carried there. At night everyone still gathers by the fire.
+- Fixed: when the clearing grew on the left, jobs already waiting could be worked on the wrong plot.
 - Saved villages are now checked field by field when they load, so a damaged save or a malformed
   code is refused instead of drawn.
 

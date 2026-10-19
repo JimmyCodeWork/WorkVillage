@@ -12,6 +12,7 @@ import {
   HUT,
   LOG,
   ROCKS,
+  STONE_BLOCK,
   STOREHOUSE,
   STUMP,
   TENT,
@@ -26,8 +27,8 @@ import type { BuildingKind } from '../core/balance'
 import { BUILDINGS } from '../core/balance'
 import { hash01, wildPlot, type Plot, type Village } from '../core/world'
 import { invertMonochrome, isMono, toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
-import { createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
-import { isWorked, plotCenter, PLOT, type Scene } from './sim'
+import { CLEAR, createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
+import { FALL_TICKS, isWorked, plotCenter, PLOT, type Chip, type Effect, type Scene } from './sim'
 
 /** Scene heights in pixels; a terminal row holds two. */
 export const SCENE_HEIGHTS = { small: 14, medium: 20 } as const
@@ -178,6 +179,70 @@ function drawPlot(
   }
 }
 
+/** Rows a felled tree leaves standing: its stump. */
+const STUMP_ROWS = 3
+
+/**
+ * Draws a tree turned about the top of its stump by `angle` radians (positive
+ * leans right), sampling the sprite backwards so no pixel is left as a hole.
+ */
+function drawTreeTurned(canvas: Canvas, art: Sprite, x: number, y: number, angle: number, groundY: number): void {
+  const pivotX = Math.floor(art.width / 2)
+  const pivotY = art.height - STUMP_ROWS
+  const originX = x + pivotX
+  // As it comes down it rests on its crown, so the trunk lifts off the ground a little.
+  const originY = y + pivotY - Math.round(Math.abs(Math.sin(angle)) * 2)
+  const radius = Math.ceil(Math.hypot(art.width, art.height))
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  for (let dy = -radius; dy <= radius; dy++) {
+    const py = originY + dy
+    // A falling tree lies on the grass, never in the soil.
+    if (py > groundY) continue
+    for (let dx = -radius; dx <= radius; dx++) {
+      const sx = Math.round(dx * cos + dy * sin) + pivotX
+      const sy = Math.round(-dx * sin + dy * cos) + pivotY
+      if (sx < 0 || sy < 0 || sx >= art.width || sy >= pivotY) continue
+      const color = art.pixels[sy * art.width + sx]!
+      if (color !== CLEAR) setPixel(canvas, originX + dx, py, color)
+    }
+  }
+}
+
+/** A plot in the middle of a job: a tree falling or felled, a boulder cracked or broken. */
+function drawEffect(canvas: Canvas, effect: Effect, plot: Plot, x0: number, tick: number): void {
+  const GROUND = groundOf(canvas)
+  const centered = (sprite: Sprite): number => x0 + Math.floor((PLOT - sprite.width) / 2)
+  if (effect.kind === 'falling' || effect.kind === 'felled') {
+    drawSprite(canvas, STUMP, centered(STUMP), bottomY(canvas, STUMP))
+    if (plot.kind !== 'tree') return
+    const art = TREES[plot.variant % TREES.length]!
+    // It tips slowly, then gathers speed until it hits the ground.
+    const t = effect.kind === 'felled' ? 1 : Math.min(1, (tick - effect.start) / FALL_TICKS)
+    const angle = (Math.PI / 2) * t * t * (effect.towardLeft ? -1 : 1)
+    drawTreeTurned(canvas, art, centered(art), bottomY(canvas, art), angle, GROUND)
+    return
+  }
+  if (plot.kind === 'rock' && effect.kind === 'cracked') {
+    const art = ROCKS[plot.variant % ROCKS.length]!
+    const x = centered(art)
+    const y = bottomY(canvas, art)
+    drawSprite(canvas, art, x, y)
+    const mid = Math.floor(art.width / 2)
+    for (let i = 0; i < art.height - 1; i++) setPixel(canvas, x + mid + (i % 2), y + i, P.outline)
+    return
+  }
+  // Broken up: a few blocks of stone waiting to be carried off.
+  for (const dx of [1, 5, 9]) drawSprite(canvas, STONE_BLOCK, x0 + dx - 1, GROUND - 1)
+}
+
+const CHIP_COLORS: Readonly<Record<Chip['color'], number>> = { wood: P.woodLight, stone: P.stoneLight, leaf: P.leaf }
+
+function drawChips(canvas: Canvas, scene: Scene, camera: number): void {
+  const GROUND = groundOf(canvas)
+  for (const chip of scene.chips) setPixel(canvas, Math.round(chip.x - camera), Math.round(GROUND + chip.y), CHIP_COLORS[chip.color])
+}
+
 function drawStockpile(canvas: Canvas, village: Village, x: number): void {
   const GROUND = groundOf(canvas)
   // A small woodpile right of the fire; it grows with the wood in store.
@@ -233,8 +298,10 @@ export function renderFrame(
     const inside = index >= 0 && index < village.plots.length
     const plot = inside ? (scene.holds.get(index) ?? village.plots[index]!) : wildPlot(village.seed, index - village.camp)
     const x0 = index * PLOT - camera
+    const effect = inside ? scene.effects.get(index) : undefined
     const shake = inside && plot.kind === 'tree' && isWorked(scene, index) ? (Math.floor(tick / 3) % 2 === 0 ? 1 : -1) : 0
-    drawPlot(canvas, plot, x0, village.seed, index, shake, tick)
+    if (effect) drawEffect(canvas, effect, plot, x0, tick)
+    else drawPlot(canvas, plot, x0, village.seed, index, shake, tick)
     if (plot.kind === 'building' && plot.progress >= BUILDINGS[plot.building].steps) {
       const art = BUILDING_ART[plot.building]
       lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art) })
@@ -248,6 +315,7 @@ export function renderFrame(
   for (const w of sorted) {
     drawVillager(canvas, w.x - camera, GROUND + 2 - VILLAGER_HEIGHT + w.hop, w.pose, w.tunic, w.facingLeft)
   }
+  drawChips(canvas, scene, camera)
 
   nightShade(canvas, background, sky, fireX)
   if (sky.dim > 0) {

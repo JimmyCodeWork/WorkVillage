@@ -4,6 +4,7 @@
 
 import { TUNICS } from '../art/palette'
 import type { Pose } from '../art/villager'
+import { BUILDINGS } from '../core/balance'
 import { random, type Action, type ActionKind, type Plot, type Village } from '../core/world'
 
 /** Pixels per plot, along the ground. */
@@ -22,12 +23,29 @@ export type Walker = {
   phase: Phase
   pose: Pose
   action?: Action
+  /** Which step of the job is under way, from the job's STEPS. */
+  step: number
   targetX: number
   workLeft: number
   carry?: 'log' | 'stone'
   restUntil: number
   hop: number
+  /** The villager whose job this one is lending a hand with. */
+  helping?: number
 }
+
+/**
+ * What a plot shows while a job changes it, drawn in place of the plot: a
+ * tree falling and then lying felled, a boulder cracking and then broken.
+ */
+export type Effect =
+  | { kind: 'falling'; start: number; towardLeft: boolean }
+  | { kind: 'felled'; towardLeft: boolean }
+  | { kind: 'cracked' }
+  | { kind: 'rubble' }
+
+/** A chip of wood or stone thrown up by a blow, in world pixels. */
+export type Chip = { x: number; y: number; vx: number; vy: number; life: number; color: 'wood' | 'stone' | 'leaf' }
 
 export type Scene = {
   tick: number
@@ -35,25 +53,57 @@ export type Scene = {
   walkers: Walker[]
   queue: Action[]
   holds: Map<number, Plot>
+  effects: Map<number, Effect>
+  chips: Chip[]
+  /** A finished storehouse nearest the camp, where timber and stone are taken. */
+  depot?: number
   nextId: number
   rand: () => number
 }
 
 const SPEED = 1
 const MAX_QUEUE = 6
-const WORK_TICKS: Record<ActionKind, number> = {
-  chop: 18,
-  clear: 12,
-  quarry: 18,
-  plant: 14,
-  tend: 12,
-  harvest: 14,
-  build: 18,
-  forage: 10,
-  arrive: 0,
-  celebrate: 16,
-  study: 24,
-  ponder: 18,
+/** Work goes twice as fast while this many jobs wait, so a busy session never falls far behind. */
+const BACKLOG = 3
+/** Ticks a fall takes, from the last blow until the tree lies on the ground. */
+export const FALL_TICKS = 8
+
+type Step = { ticks: number; effect?: Effect['kind'] }
+
+/**
+ * Each job as the steps a villager works through at the plot. Felling a
+ * tree is many blows, the fall, and then cutting the trunk to length; a
+ * boulder is struck until it cracks, then broken up.
+ */
+const STEPS: Readonly<Record<ActionKind, readonly Step[]>> = {
+  chop: [{ ticks: 42 }, { ticks: FALL_TICKS + 4, effect: 'falling' }, { ticks: 18, effect: 'felled' }],
+  clear: [{ ticks: 30 }],
+  quarry: [{ ticks: 24 }, { ticks: 18, effect: 'cracked' }, { ticks: 10, effect: 'rubble' }],
+  plant: [{ ticks: 20 }],
+  tend: [{ ticks: 18 }],
+  harvest: [{ ticks: 22 }],
+  build: [{ ticks: 36 }],
+  forage: [{ ticks: 16 }],
+  arrive: [{ ticks: 0 }],
+  celebrate: [{ ticks: 16 }],
+  study: [{ ticks: 32 }],
+  ponder: [{ ticks: 24 }],
+}
+
+/** How many villagers can work one job together, the one who took it included. */
+const CREW: Readonly<Record<ActionKind, number>> = {
+  chop: 2,
+  clear: 2,
+  quarry: 2,
+  plant: 1,
+  tend: 1,
+  harvest: 3,
+  build: 3,
+  forage: 1,
+  arrive: 1,
+  celebrate: 1,
+  study: 1,
+  ponder: 1,
 }
 
 /** Offset from a villager's box to its feet, for standing beside a plot. */
@@ -66,10 +116,12 @@ export function createScene(village: Village, seed = village.seed): Scene {
     walkers: [],
     queue: [],
     holds: new Map(),
+    effects: new Map(),
+    chips: [],
     nextId: 1,
     rand: random(seed ^ 0x5eed),
   }
-  syncPopulation(scene, village)
+  syncScene(scene, village)
   return scene
 }
 
@@ -86,6 +138,7 @@ function addWalker(scene: Scene, x: number, phase: Phase): Walker {
     facingLeft: false,
     phase,
     pose: 'stand',
+    step: 0,
     targetX: x,
     workLeft: 0,
     restUntil: 0,
@@ -95,20 +148,37 @@ function addWalker(scene: Scene, x: number, phase: Phase): Walker {
   return walker
 }
 
-/** Keeps the scene in step with the village: its camp and its population. */
+function shifted<V>(map: Map<number, V>, shift: number): Map<number, V> {
+  const next = new Map<number, V>()
+  for (const [index, value] of map) next.set(index + shift, value)
+  return next
+}
+
+/** Keeps the scene in step with the village: its camp, its storehouse and its population. */
 export function syncScene(scene: Scene, village: Village): void {
   const shift = village.camp - scene.camp
   if (shift !== 0) {
+    // The clearing grew on the left: every plot index moves along with the camp.
     for (const w of scene.walkers) {
       w.x += shift * PLOT
       w.targetX += shift * PLOT
     }
-    scene.queue = scene.queue.map(a => ({ ...a }))
-    const holds = new Map<number, Plot>()
-    for (const [index, plot] of scene.holds) holds.set(index + shift, plot)
-    scene.holds = holds
+    const moved = new Map<Action, Action>()
+    const move = (a: Action): Action => {
+      if (!moved.has(a)) moved.set(a, { ...a, plot: a.plot + shift })
+      return moved.get(a)!
+    }
+    scene.queue = scene.queue.map(move)
+    for (const w of scene.walkers) if (w.action) w.action = move(w.action)
+    for (const chip of scene.chips) chip.x += shift * PLOT
+    scene.holds = shifted(scene.holds, shift)
+    scene.effects = shifted(scene.effects, shift)
     scene.camp = village.camp
   }
+  scene.depot = village.plots
+    .map((plot, index) => ({ plot, index }))
+    .filter(({ plot }) => plot.kind === 'building' && plot.building === 'storehouse' && plot.progress >= BUILDINGS.storehouse.steps)
+    .sort((a, b) => Math.abs(a.index - village.camp) - Math.abs(b.index - village.camp))[0]?.index
   syncPopulation(scene, village)
 }
 
@@ -143,18 +213,25 @@ export function enqueue(scene: Scene, action: Action, village: Village): void {
   }
 }
 
-function standFor(walker: Walker, action: Action): { x: number; facingLeft: boolean } {
+/** Where a villager stands to work a plot: the side it comes from, or as a helper the other side. */
+function standFor(walker: Walker, action: Action, side?: 'left' | 'right', spread = 0): { x: number; facingLeft: boolean } {
   const center = plotCenter(action.plot)
-  const fromRight = walker.x + 4 > center
-  return fromRight ? { x: center + 1, facingLeft: true } : { x: center - REACH - 1, facingLeft: false }
+  const fromRight = side === undefined ? walker.x + 4 > center : side === 'right'
+  return fromRight
+    ? { x: center + 1 + spread, facingLeft: true }
+    : { x: center - REACH - 1 - spread, facingLeft: false }
 }
 
-function workPose(kind: ActionKind, beat: boolean): Pose {
+function workPose(kind: ActionKind, step: number, beat: boolean): Pose {
   switch (kind) {
     case 'chop':
+      // The tree's fall is watched, not worked.
+      if (step === 1) return 'stand'
+      return beat ? 'axeUp' : 'axeDown'
     case 'clear':
       return beat ? 'axeUp' : 'axeDown'
     case 'quarry':
+      if (step === 2) return 'kneel'
       return beat ? 'pickUp' : 'pickDown'
     case 'build':
       return beat ? 'hammerUp' : 'hammerDown'
@@ -187,18 +264,126 @@ function walk(walker: Walker, tick: number): boolean {
   return false
 }
 
+/** Where timber and stone are taken: the storehouse once there is one, else the woodpile by the fire. */
+function dropX(scene: Scene): number {
+  if (scene.depot !== undefined) return plotCenter(scene.depot) - 4 + Math.floor(scene.rand() * 3) - 1
+  return campX(scene) - 14 - Math.floor(scene.rand() * 4)
+}
+
+function restSpot(scene: Scene): number {
+  return campX(scene) - 14 - Math.floor(scene.rand() * 4)
+}
+
+function startStep(scene: Scene, walker: Walker, step: number): void {
+  const action = walker.action!
+  const spec = STEPS[action.kind][step]!
+  walker.step = step
+  // A long queue speeds the work along so the scene keeps up with the session.
+  const pace = scene.queue.length >= BACKLOG ? 0.5 : 1
+  walker.workLeft = Math.max(1, Math.round(spec.ticks * pace))
+  if (spec.effect === 'falling') {
+    scene.effects.set(action.plot, { kind: 'falling', start: scene.tick, towardLeft: walker.facingLeft })
+  } else if (spec.effect === 'felled') {
+    const before = scene.effects.get(action.plot)
+    scene.effects.set(action.plot, { kind: 'felled', towardLeft: before?.kind === 'falling' ? before.towardLeft : walker.facingLeft })
+  } else if (spec.effect !== undefined) {
+    scene.effects.set(action.plot, { kind: spec.effect })
+  }
+}
+
+function throwChips(scene: Scene, walker: Walker, color: Chip['color'], count: number): void {
+  const x = walker.facingLeft ? walker.x : walker.x + 8
+  for (let i = 0; i < count; i++) {
+    const away = walker.facingLeft ? 1 : -1
+    scene.chips.push({
+      x,
+      y: -3 - scene.rand() * 2,
+      vx: (scene.rand() * 0.6 + 0.2) * away * (scene.rand() < 0.3 ? -1 : 1),
+      vy: -0.6 - scene.rand() * 0.5,
+      life: 6 + Math.floor(scene.rand() * 4),
+      color,
+    })
+  }
+}
+
+/** On each blow: the tree sheds a chip and now and then a leaf; stone throws grit. */
+function onBlow(scene: Scene, walker: Walker): void {
+  const action = walker.action!
+  if (action.kind === 'chop' && walker.step === 0) {
+    throwChips(scene, walker, 'wood', 1)
+    if (scene.rand() < 0.35) throwChips(scene, walker, 'leaf', 1)
+  } else if (action.kind === 'chop' || action.kind === 'clear') {
+    throwChips(scene, walker, 'wood', 1)
+  } else if (action.kind === 'quarry') {
+    throwChips(scene, walker, 'stone', walker.step === 1 ? 2 : 1)
+  }
+}
+
+/** The job is done: the plot shows what it has become, and the crew goes back. */
+function finish(scene: Scene, walker: Walker): void {
+  const action = walker.action!
+  scene.holds.delete(action.plot)
+  scene.effects.delete(action.plot)
+  const load = action.kind === 'chop' || action.kind === 'clear' ? 'log' : action.kind === 'quarry' ? 'stone' : undefined
+  const crew = scene.walkers.filter(w => w.helping === walker.id)
+  // A helper takes the load home, so the one who took the job is free for the next.
+  const bearer = load !== undefined ? (crew[0] ?? walker) : undefined
+  for (const w of [walker, ...crew]) {
+    w.carry = w === bearer ? load : undefined
+    w.action = undefined
+    w.helping = undefined
+    w.step = 0
+    w.phase = 'returning'
+    w.targetX = w.carry !== undefined ? dropX(scene) : restSpot(scene)
+  }
+}
+
+/** A villager with nothing to do joins a job under way that has room. */
+function lendHand(scene: Scene, walker: Walker): boolean {
+  for (const lead of scene.walkers) {
+    if (lead === walker || lead.helping !== undefined || lead.action === undefined) continue
+    if (lead.phase !== 'toWork' && !(lead.phase === 'working' && lead.step === 0 && lead.workLeft > 12)) continue
+    const crew = scene.walkers.filter(w => w.helping === lead.id).length
+    if (crew + 1 >= CREW[lead.action.kind]) continue
+    const leadSide = standFor(lead, lead.action).facingLeft ? 'right' : 'left'
+    const side = crew === 0 ? (leadSide === 'right' ? 'left' : 'right') : leadSide
+    const stand = standFor(walker, lead.action, side, crew === 0 ? 0 : 4)
+    walker.helping = lead.id
+    walker.action = lead.action
+    walker.step = 0
+    walker.phase = 'toWork'
+    walker.targetX = stand.x
+    return true
+  }
+  return false
+}
+
+function stepChips(scene: Scene): void {
+  for (const chip of scene.chips) {
+    chip.x += chip.vx
+    chip.y += chip.vy
+    chip.vy += 0.25
+    chip.life--
+  }
+  scene.chips = scene.chips.filter(c => c.life > 0 && c.y < 2)
+}
+
 /** Advances the scene by one frame. `isNight` sends idle villagers to the fire. */
 export function stepScene(scene: Scene, isNight: boolean): void {
   scene.tick++
   const tick = scene.tick
+  stepChips(scene)
 
   for (const walker of scene.walkers) {
-    if (walker.phase !== 'idle' || scene.queue.length === 0) continue
+    if (scene.queue.length === 0) break
+    // Free hands take the next job: an idle villager, or one walking back empty-handed.
+    const isFree = walker.phase === 'idle' || (walker.phase === 'returning' && walker.carry === undefined)
+    if (!isFree || walker.helping !== undefined) continue
     const action = scene.queue.shift()!
     walker.action = action
+    walker.step = 0
     walker.phase = 'toWork'
-    const stand = standFor(walker, action)
-    walker.targetX = stand.x
+    walker.targetX = standFor(walker, action).x
   }
 
   for (const walker of scene.walkers) {
@@ -214,27 +399,44 @@ export function stepScene(scene: Scene, isNight: boolean): void {
       case 'toWork': {
         const action = walker.action!
         if (walk(walker, tick)) {
-          walker.facingLeft = standFor(walker, action).facingLeft
+          const center = plotCenter(action.plot)
+          walker.facingLeft = walker.x + 4 > center
           walker.phase = 'working'
-          walker.workLeft = WORK_TICKS[action.kind]
+          if (walker.helping === undefined) startStep(scene, walker, 0)
         }
         break
       }
       case 'working': {
         const action = walker.action!
+        const beat = Math.floor(tick / 3) % 2 === 0
+        if (walker.helping !== undefined) {
+          // A helper works alongside until the job is done; finish() sends it back.
+          const lead = scene.walkers.find(w => w.id === walker.helping)
+          if (lead === undefined || lead.action !== action) {
+            walker.helping = undefined
+            walker.action = undefined
+            walker.phase = 'returning'
+            walker.targetX = restSpot(scene)
+            break
+          }
+          // Out of step with the one it helps, so the blows alternate.
+          walker.step = lead.step
+          walker.pose = workPose(action.kind, lead.step, !beat)
+          if (beat && tick % 3 === 0 && walker.pose !== 'stand') onBlow(scene, walker)
+          break
+        }
         walker.workLeft--
         if (action.kind === 'celebrate') {
           walker.pose = 'stand'
           walker.hop = Math.floor(tick / 3) % 2 === 0 ? -2 : 0
         } else {
-          walker.pose = workPose(action.kind, Math.floor(tick / 3) % 2 === 0)
+          walker.pose = workPose(action.kind, walker.step, beat)
+          // A blow lands as the tool comes down.
+          if (!beat && tick % 3 === 0 && walker.pose !== 'stand') onBlow(scene, walker)
         }
         if (walker.workLeft <= 0) {
-          scene.holds.delete(action.plot)
-          walker.carry = action.kind === 'chop' || action.kind === 'clear' ? 'log' : action.kind === 'quarry' ? 'stone' : undefined
-          walker.action = undefined
-          walker.phase = 'returning'
-          walker.targetX = campX(scene) - 14 - Math.floor(scene.rand() * 4)
+          if (walker.step + 1 < STEPS[action.kind].length) startStep(scene, walker, walker.step + 1)
+          else finish(scene, walker)
         }
         break
       }
@@ -252,6 +454,7 @@ export function stepScene(scene: Scene, isNight: boolean): void {
           break
         }
         if (tick < walker.restUntil) break
+        if (!isNight && lendHand(scene, walker)) break
         const spot = isNight ? 10 + scene.rand() * 6 : 6 + scene.rand() * 30
         const side = scene.rand() < 0.5 ? -1 : 1
         walker.targetX = Math.round(campX(scene) - 4 + side * spot)
@@ -263,12 +466,18 @@ export function stepScene(scene: Scene, isNight: boolean): void {
   }
 }
 
-/** Is a plot being worked on right now (for a shaking tree)? */
+/** Is a plot being struck right now (for a shaking tree)? */
 export function isWorked(scene: Scene, plot: number): boolean {
-  return scene.walkers.some(w => w.phase === 'working' && w.action?.plot === plot)
+  return scene.walkers.some(
+    w => w.phase === 'working' && w.action?.plot === plot && STEPS[w.action.kind][w.step]?.effect === undefined,
+  )
 }
 
 /** Whether anything is moving; a quiet scene can be drawn less often. */
 export function isBusy(scene: Scene): boolean {
-  return scene.queue.length > 0 || scene.walkers.some(w => w.phase !== 'idle' || w.x !== w.targetX)
+  return (
+    scene.queue.length > 0 ||
+    scene.chips.length > 0 ||
+    scene.walkers.some(w => w.phase !== 'idle' || w.x !== w.targetX)
+  )
 }

@@ -41,12 +41,16 @@ Requires Claude Code 2.1.275 or later.
 | A new file is written | Quarry a boulder for **stone** |
 | Files are read or searched | Read by the fire for **knowledge**; now and then forage for food |
 | Claude thinks before answering, or hands work to a subagent | Ponder by the fire for more **knowledge** |
-
-Every 4 knowledge becomes a planned step on the building under way, so reading and thinking help
-the village grow too.
 | A test run passes | Plant, water and harvest fields for **food** |
 | A `git commit` succeeds | A milestone: a big push on the current building |
 | A to-do or task is completed | A new villager arrives, if there is a home for them |
+
+Every 4 knowledge becomes a planned step on the building under way, so reading and thinking help
+the village grow too.
+
+Villagers see each job through: a tree takes many blows of the axe, falls and is cut to length,
+and a boulder is struck until it cracks and breaks apart. Villagers with nothing to do lend a hand
+with the work under way, and once a storehouse stands, timber and stone are carried there.
 
 Buildings are raised in order: Tent, Hut, Well, Storehouse, House, Workshop and Watchtower.
 Each costs timber and stone and takes several steps of work to finish. When the trees near the

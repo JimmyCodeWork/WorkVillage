@@ -97,3 +97,80 @@ describe('svg', () => {
     expect([...drawn]).toEqual([...frame.pixels].map(c => c & 0xffffff))
   })
 })
+
+describe('work', () => {
+  const working = (scene: ReturnType<typeof createScene>) => scene.walkers.filter(w => w.phase === 'working')
+
+  test('a tree takes many blows, falls, and only then becomes a stump', () => {
+    let village = createVillage(1, 0)
+    const scene = createScene(village)
+    const outcome = applySignal(village, 'edit')
+    expect(outcome.action?.kind).toBe('chop')
+    village = outcome.village
+    enqueue(scene, outcome.action!, village)
+    syncScene(scene, village)
+    const plot = outcome.action!.plot
+    let blows = 0
+    let fellAt = -1
+    for (let i = 0; i < 300 && scene.holds.has(plot); i++) {
+      const chips = scene.chips.length
+      stepScene(scene, false)
+      if (scene.chips.length > chips && fellAt < 0) blows++
+      if (fellAt < 0 && scene.effects.get(plot)?.kind === 'falling') fellAt = i
+    }
+    expect(blows).toBeGreaterThanOrEqual(6)
+    expect(fellAt).toBeGreaterThan(-1)
+    expect(scene.holds.has(plot)).toBe(false)
+    expect(scene.effects.size).toBe(0)
+  })
+
+  test('idle villagers lend a hand, and one carries the timber home', () => {
+    let village = { ...createVillage(1, 0), villagers: 3 }
+    const scene = createScene(village)
+    const outcome = applySignal(village, 'edit')
+    village = outcome.village
+    enqueue(scene, outcome.action!, village)
+    syncScene(scene, village)
+    let crew = 0
+    for (let i = 0; i < 300 && scene.holds.size > 0; i++) {
+      stepScene(scene, false)
+      crew = Math.max(crew, working(scene).length)
+    }
+    // Felling takes two: the one who took the job and one helper.
+    expect(crew).toBe(2)
+    const bearers = scene.walkers.filter(w => w.carry === 'log')
+    expect(bearers.length).toBe(1)
+    // The other is empty-handed and free for the next job at once.
+    expect(scene.walkers.filter(w => w.phase === 'returning' && w.carry === undefined).length).toBe(1)
+  })
+
+  test('the next job is taken on the way back, without first returning to the fire', () => {
+    let village = { ...createVillage(1, 0), villagers: 2 }
+    const scene = createScene(village)
+    for (const signal of ['edit', 'edit'] as const) {
+      const outcome = applySignal(village, signal)
+      village = outcome.village
+      enqueue(scene, outcome.action!, village)
+      syncScene(scene, village)
+    }
+    // Both jobs are taken at once; nobody waits by the fire while work is queued.
+    stepScene(scene, false)
+    expect(scene.queue.length).toBe(0)
+    expect(scene.walkers.every(w => w.phase === 'toWork')).toBe(true)
+  })
+
+  test('at night nobody joins a job; they gather by the fire', () => {
+    let village = { ...createVillage(1, 0), villagers: 3 }
+    const scene = createScene(village)
+    const outcome = applySignal(village, 'edit')
+    village = outcome.village
+    enqueue(scene, outcome.action!, village)
+    syncScene(scene, village)
+    let crew = 0
+    for (let i = 0; i < 300; i++) {
+      stepScene(scene, true)
+      crew = Math.max(crew, working(scene).length)
+    }
+    expect(crew).toBe(1)
+  })
+})
