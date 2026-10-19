@@ -1,5 +1,8 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { decodeArchive } from '../src/core/archive'
+import { createVillage } from '../src/core/world'
+
 const BAND = {
   component: 'AbovePrompt',
   props: {
@@ -323,4 +326,105 @@ test('the scene holds still while the pointer rests on the Settings button', asy
   await clock.advance(2000)
   expect(frames).toBeGreaterThan(before)
   await band.unmount()
+})
+
+test('the settings pane copies a village and imports one back, with undo', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/data' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  on('ui.toast', () => ({ value: undefined }))
+  on('tool.call', () => ({ result: { filePath: '/x', oldString: '', newString: '' } as never }))
+  const copied: string[] = []
+  on('ui.copy', (_$, e) => {
+    copied.push(e.text)
+    return { value: { isCopied: true } }
+  })
+
+  await $.session.start({ cwd: '/work/data', surface: 'terminal', isInteractive: true })
+  for (let i = 0; i < 30; i++) await $.tool.call({ tool: 'Edit', file_path: '/x', old_string: 'a', new_string: 'b' } as never)
+  const before = (await $.command.run({ command: 'village', args: 'stats' } as never)).text ?? ''
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const panel = await $.ui.mount({ plugin: 'workvillage', surface, ...SETTINGS_PANE })
+    await panel.press({ key: 'export-village' })
+    expect(await panel.find({ type: 'Text', text: /Copied the export code/ })).toBeDefined()
+    await panel.unmount()
+  }
+  const code = copied.at(-1)!
+  expect(code).toMatch(/^WV1\./)
+
+  await $.command.run({ command: 'village', args: 'reset confirm' } as never)
+  expect((await $.command.run({ command: 'village', args: 'stats' } as never)).text).toMatch(/Edits 0/)
+
+  const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...SETTINGS_PANE })
+  await panel.input({ key: 'import', text: 'not a code' })
+  expect(await panel.find({ type: 'Text', text: /not a WorkVillage export code/ })).toBeDefined()
+  expect(await panel.find({ key: 'import-confirm' })).toBeUndefined()
+
+  await panel.input({ key: 'import', text: code })
+  expect(await panel.find({ type: 'Text', text: /will replace this project/ })).toBeDefined()
+  await panel.press({ key: 'import-confirm' })
+  expect(await panel.find({ type: 'Text', text: /Imported/ })).toBeDefined()
+  const after = (await $.command.run({ command: 'village', args: 'stats' } as never)).text ?? ''
+  expect(after.split('\n')[2]).toBe(before.split('\n')[2])
+  // Importing is not work: the device's lifetime count stays as it was.
+  expect(after.split('\n')[3]).toBe(before.split('\n')[3])
+
+  await panel.press({ key: 'import-undo' })
+  expect(await panel.find({ type: 'Text', text: /undone/ })).toBeDefined()
+  expect(await panel.find({ key: 'import-undo' })).toBeUndefined()
+  expect((await $.command.run({ command: 'village', args: 'stats' } as never)).text).toMatch(/Edits 0/)
+  await panel.unmount()
+})
+
+test('a backup holds every village on the device; mobile shows the code to copy by hand', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on, {
+    'village:/work/other': JSON.parse(JSON.stringify(createVillage(5, 0))),
+  })
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/phone' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  on('ui.copy', () => ({ value: { isCopied: false, reason: 'no-clipboard' } }))
+
+  await $.session.start({ cwd: '/work/phone', surface: 'mobile', isInteractive: true })
+  const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'mobile', ...SETTINGS_PANE })
+  // No field to paste into on mobile, so no import there.
+  expect(await panel.find({ key: 'import' })).toBeUndefined()
+  await panel.press({ key: 'export-backup' })
+  expect(await panel.find({ type: 'Text', text: /Copy the export code/ })).toBeDefined()
+  const code = JSON.stringify(await panel.find({ type: 'Code' }))
+  const shown = /"source":"([^"]+)"/.exec(code)?.[1] ?? ''
+  const read = decodeArchive(shown)
+  expect('archive' in read && read.archive.kind === 'backup' && Object.keys(read.archive.villages).sort()).toEqual([
+    'village:/work/other',
+    'village:/work/phone',
+  ])
+  await panel.unmount()
+})
+
+test('/village stats counts the work of every project on the device', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on, {
+    profile: {
+      version: 1,
+      lifetime: { edits: 100, reads: 0, tests: 0, commits: 7, tasks: 0, turns: 0, actions: 107, thoughts: 0 },
+      villages: { 'village:/work/old': { stage: 'hamlet', villagers: 3, built: 2, updatedAt: 0 } },
+      createdAt: 0,
+    },
+  })
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/new' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  on('tool.call', () => ({ result: { filePath: '/x', oldString: '', newString: '' } as never }))
+
+  await $.session.start({ cwd: '/work/new', surface: 'terminal', isInteractive: true })
+  await $.tool.call({ tool: 'Edit', file_path: '/x', old_string: 'a', new_string: 'b' } as never)
+  const text = (await $.command.run({ command: 'village', args: 'stats' } as never)).text
+  expect(text).toMatch(/All projects on this device \(2 villages\): Edits 101 .* Commits 7/)
 })

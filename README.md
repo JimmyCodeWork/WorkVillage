@@ -61,7 +61,7 @@ Failed tool calls never cost you anything: the village only ever grows.
 | --- | --- |
 | `/village` | Open the village pane with resources and activity |
 | `/village show` / `/village hide` | Show or hide the band above the prompt |
-| `/village stats` | Print the village's resources and your activity |
+| `/village stats` | Print the village's resources, your activity, and the totals for every project on this device |
 | `/village settings` | Open the settings panel |
 | `/village reset confirm` | Return this project's village to wilderness |
 
@@ -78,6 +78,25 @@ under **workvillage**.
 | `pixel` | `small`, `medium`, `large` (see below) | `small` |
 | `language` | `auto`, `en`, `zh-TW` | `auto` (follows `LC_ALL`, `LC_MESSAGES` or `LANG`) |
 | `animation` | `full`, `reduced`, `off` | `full` |
+
+### Export and import
+
+The settings panel also keeps your villages safe and lets you move them:
+
+- **Copy this village** puts an export code for this project's village on the clipboard.
+- **Copy a full backup** copies every village on this device together with its lifetime record.
+  A backup names each project's folder, so it can put each village back in place; keep it to
+  yourself.
+- **Import**: paste a code and press Enter. WorkVillage shows what the code holds and changes
+  nothing until you confirm. A village replaces this project's village; a backup replaces the
+  villages it holds and the lifetime record.
+- **Undo import** puts back whatever the last import replaced.
+
+Where the clipboard is not available, the code is shown in the panel to copy by hand. Importing
+needs a text field, so it is available in the terminal and the desktop app. An export code holds
+only counts and the village's layout, never file names, contents or commands. Close other Claude
+Code sessions of the same project before importing into it: a session still open keeps its own
+copy of the village and saves it over the import.
 
 ### Black and white
 
@@ -114,7 +133,8 @@ The `mono` palettes draw the village as black-and-white line art, in a light and
 WorkVillage makes no network requests and sends no telemetry. It only counts what kind of work
 happened (an edit, a read, a passing test). It never stores file names, file contents, commands or
 prompts. Each project's village is saved in WorkVillage's own plugin store, keyed by the project's
-root directory.
+root directory, beside one lifetime record for the device: the work of every project added up,
+and a short summary of each village.
 
 ## Development
 

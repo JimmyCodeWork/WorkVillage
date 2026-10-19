@@ -59,7 +59,7 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 | --- | --- |
 | `/village` | 開啟村莊面板，檢視資源與開發活動 |
 | `/village show` / `/village hide` | 顯示或隱藏輸入框上方的村莊 |
-| `/village stats` | 列出村莊資源與開發活動統計 |
+| `/village stats` | 列出村莊資源、開發活動統計，以及本裝置所有專案的累計 |
 | `/village settings` | 開啟設定面板 |
 | `/village reset confirm` | 將此專案的村莊重置為荒野 |
 
@@ -75,6 +75,22 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 | `pixel` | `small`、`medium`、`large`（說明如下） | `small` |
 | `language` | `auto`、`en`、`zh-TW` | `auto`（依 `LC_ALL`、`LC_MESSAGES` 或 `LANG` 判斷） |
 | `animation` | `full`、`reduced`、`off` | `full` |
+
+### 匯出與匯入
+
+設定面板也可備份及移轉村莊：
+
+- **複製此村莊**：將此專案村莊的匯出碼複製到剪貼簿。
+- **複製完整備份**：複製本裝置所有村莊及累計紀錄。完整備份會包含各專案的資料夾路徑，
+  以便將每座村莊還原至原專案，請勿公開分享。
+- **匯入**：貼上匯出碼後按 Enter，WorkVillage 會先顯示內容摘要，確認後才會變更。
+  單一村莊會取代此專案的村莊；完整備份則取代其中包含的村莊與累計紀錄。
+- **復原匯入**：還原上一次匯入所取代的資料。
+
+無法使用剪貼簿時，匯出碼會直接顯示於面板中，可手動複製。匯入需要文字輸入欄位，
+因此僅能在終端機與桌面版應用程式中使用。匯出碼只包含計數與村莊配置，
+不含檔名、檔案內容或指令。匯入前請先關閉同一專案的其他 Claude Code 工作階段，
+否則仍開啟中的工作階段會保留自己的村莊副本，並在存檔時覆蓋匯入的內容。
 
 ### 黑白模式
 
@@ -107,7 +123,8 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 
 WorkVillage 不會發出任何網路請求，也不會傳送任何遙測資料。它只記錄工作的類型
 （編輯、讀取、測試通過等），絕不保存檔名、檔案內容、指令或提示詞。
-各專案的村莊資料儲存在 WorkVillage 自身的外掛儲存區，並以專案根目錄區分。
+各專案的村莊資料儲存在 WorkVillage 自身的外掛儲存區，並以專案根目錄區分；
+另有一份本裝置共用的累計紀錄，包含所有專案的開發活動總計與各村莊的摘要。
 
 ## 開發
 

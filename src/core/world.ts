@@ -422,12 +422,80 @@ export function applySignal(village: Village, signal: Signal): Outcome {
   return { village: v, action, milestones }
 }
 
-/** Reads a saved village back, or undefined when it is not one. */
+/** Larger than any count a village reaches by work; past it a value is not a village's. */
+const MAX_COUNT = 1e9
+const STAT_KEYS: readonly (keyof Stats)[] = ['edits', 'reads', 'tests', 'commits', 'tasks', 'turns', 'actions', 'thoughts']
+
+function isCount(value: unknown, max = MAX_COUNT): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max
+}
+
+function restorePlot(value: unknown): Plot | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const p = value as Record<string, unknown>
+  switch (p.kind) {
+    case 'tree':
+    case 'rock':
+      return isCount(p.variant, 15) ? { kind: p.kind, variant: p.variant } : undefined
+    case 'stump':
+    case 'grass':
+    case 'camp':
+      return { kind: p.kind }
+    case 'farm':
+      return isCount(p.growth, 100) ? { kind: 'farm', growth: p.growth } : undefined
+    case 'building': {
+      if (typeof p.building !== 'string' || !Object.hasOwn(BUILDINGS, p.building)) return undefined
+      const building = p.building as BuildingKind
+      return isCount(p.progress, BUILDINGS[building].steps) ? { kind: 'building', building, progress: p.progress } : undefined
+    }
+    default:
+      return undefined
+  }
+}
+
+/**
+ * Reads a saved or imported village back, or undefined when it is not one.
+ * Every field is checked and only known fields are kept, since an imported
+ * code may come from anywhere.
+ */
 export function restore(value: unknown): Village | undefined {
   if (typeof value !== 'object' || value === null) return undefined
-  const v = value as Partial<Village>
-  if (v.version !== 1 || !Array.isArray(v.plots) || typeof v.camp !== 'number') return undefined
+  const v = value as Record<string, unknown>
+  if (v.version !== 1 || !isCount(v.seed, 0xffffffff) || !Array.isArray(v.plots)) return undefined
+  if (v.plots.length === 0 || v.plots.length > WORLD.maxPlots) return undefined
+  const plots: Plot[] = []
+  for (const item of v.plots) {
+    const plot = restorePlot(item)
+    if (plot === undefined) return undefined
+    plots.push(plot)
+  }
+  if (!isCount(v.camp, plots.length - 1) || plots[v.camp]?.kind !== 'camp') return undefined
+  if (plots.filter(p => p.kind === 'camp').length !== 1) return undefined
+  if (!isCount(v.villagers) || v.villagers < 1 || !isCount(v.nextBuild)) return undefined
+  if (typeof v.createdAt !== 'number' || !Number.isFinite(v.createdAt)) return undefined
+
+  const r = (typeof v.resources === 'object' && v.resources !== null ? v.resources : {}) as Record<string, unknown>
+  const resources = { wood: r.wood, stone: r.stone, food: r.food, knowledge: r.knowledge ?? 0 }
+  if (!Object.values(resources).every(n => isCount(n))) return undefined
+
   // Villages saved before a counter existed start it at zero.
-  const stats = { edits: 0, reads: 0, tests: 0, commits: 0, tasks: 0, turns: 0, actions: 0, thoughts: 0, ...v.stats }
-  return { ...(v as Village), stats }
+  const s = (typeof v.stats === 'object' && v.stats !== null ? v.stats : {}) as Record<string, unknown>
+  const stats = {} as Stats
+  for (const key of STAT_KEYS) {
+    const n = s[key] ?? 0
+    if (!isCount(n)) return undefined
+    stats[key] = n
+  }
+
+  return {
+    version: 1,
+    seed: v.seed,
+    plots,
+    camp: v.camp,
+    villagers: v.villagers,
+    resources: resources as Resources,
+    stats,
+    nextBuild: v.nextBuild,
+    createdAt: v.createdAt,
+  }
 }

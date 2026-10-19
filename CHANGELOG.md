@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- The settings panel can export and import villages. **Copy this village** copies an export code
+  for this project's village, and **Copy a full backup** one for every village on the device; where
+  the clipboard is not available the code is shown to copy by hand. A pasted code is checked and
+  previewed, and changes nothing until it is confirmed; **Undo import** puts back what it replaced.
+- A lifetime record now adds up the work of every project on the device. `/village stats` shows it
+  under the project's own counts. Resetting a village keeps the work it recorded.
+- Saved villages are now checked field by field when they load, so a damaged save or a malformed
+  code is refused instead of drawn.
+
 ## 0.2.8 - 2026-10-15
 
 - Fixed: on the desktop the **Settings** button flickered with the scene's animation. The scene now
