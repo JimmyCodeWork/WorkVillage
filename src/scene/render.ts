@@ -1,6 +1,6 @@
 // Composes one frame of the village: sky, hills, ground, plots, villagers.
 
-import { P, ROOF_COLORS, skyFor, type Sky } from '../art/palette'
+import { P, ROOF_COLORS, SEASON_DRIFT, SEASON_LEAVES, seasonSky, skyFor, type Sky } from '../art/palette'
 import {
   BANNER,
   BARREL,
@@ -32,7 +32,7 @@ import {
 import { drawVillager, VILLAGER_HEIGHT } from '../art/villager'
 import type { BuildingKind, PropStyle } from '../core/balance'
 import { BUILDINGS } from '../core/balance'
-import { hash01, wildPlot, type Look, type Plot, type Village } from '../core/world'
+import { hash01, seasonOf, wildPlot, type Look, type Plot, type Season, type Village } from '../core/world'
 import { invertMonochrome, isMono, toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
 import { CLEAR, createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
 import { FALL_TICKS, isWorked, plotCenter, PLOT, type Chip, type Effect, type Scene } from './sim'
@@ -161,30 +161,41 @@ function drawPlot(
   index: number,
   shake: number,
   tick: number,
+  season: Season,
   look?: Look,
 ): void {
   const GROUND = groundOf(canvas)
+  const isWinter = season === 'winter'
   const centered = (sprite: Sprite): number => x0 + Math.floor((PLOT - sprite.width) / 2)
   switch (plot.kind) {
     case 'tree': {
       const art = TREES[plot.variant % TREES.length]!
-      drawSprite(canvas, art, centered(art) + shake, bottomY(canvas, art))
+      drawSprite(canvas, art, centered(art) + shake, bottomY(canvas, art), { recolor: SEASON_LEAVES[season] })
       break
     }
     case 'rock': {
       const art = ROCKS[plot.variant % ROCKS.length]!
       drawSprite(canvas, art, centered(art), bottomY(canvas, art))
+      if (isWinter) drawSnowCap(canvas, art, centered(art), bottomY(canvas, art), false)
       break
     }
     case 'stump':
       drawSprite(canvas, STUMP, centered(STUMP), bottomY(canvas, STUMP))
+      if (isWinter) drawSnowCap(canvas, STUMP, centered(STUMP), bottomY(canvas, STUMP), false)
       break
     case 'grass':
+      // Tufts and flowers lie under the snow in winter.
+      if (isWinter) break
       if (hash01(seed + 9, index) < 0.6) drawSprite(canvas, TUFT, x0 + 2 + Math.floor(hash01(seed, index) * 6), GROUND - 1)
       if (hash01(seed + 10, index) < 0.5) drawSprite(canvas, FLOWER, x0 + 1 + Math.floor(hash01(seed + 11, index) * 9), GROUND - 1)
       break
     case 'farm': {
       drawSprite(canvas, FARM_SOIL, x0 + 1, GROUND)
+      // Fields lie fallow under the snow until spring.
+      if (isWinter) {
+        fillRect(canvas, x0 + 1, GROUND, FARM_SOIL.width, 1, P.white)
+        break
+      }
       const crop = CROPS[Math.min(plot.growth, CROPS.length - 1)]!
       drawSprite(canvas, crop, x0 + 1, GROUND - crop.height)
       break
@@ -203,6 +214,10 @@ function drawPlot(
       const style = { recolor: look ? ROOF_COLORS[look.roof] : undefined, flip: look?.mirrored }
       if (done) {
         drawSprite(canvas, art, x, y, style)
+        if (isWinter) {
+          drawSnowCap(canvas, art, x, y, style.flip === true)
+          if (plot.building === 'house') drawSmoke(canvas, x + (style.flip ? 1 : art.width - 3), y, tick)
+        }
         if (look && look.prop !== 'none' && plot.building !== 'well') {
           const prop = PROP_ART[look.prop]
           drawSprite(canvas, prop, propAt(look, x0, prop), GROUND + 1 - prop.height, style)
@@ -222,6 +237,61 @@ function drawPlot(
   }
 }
 
+/** Snow on whatever is uppermost in each column of a sprite. */
+function drawSnowCap(canvas: Canvas, art: Sprite, x: number, y: number, flip: boolean): void {
+  for (let sx = 0; sx < art.width; sx++) {
+    const source = flip ? art.width - 1 - sx : sx
+    for (let sy = 0; sy < art.height; sy++) {
+      if (art.pixels[sy * art.width + source] === CLEAR) continue
+      setPixel(canvas, x + sx, y + sy, P.white)
+      break
+    }
+  }
+}
+
+/** Smoke rising from a chimney whose top is at (x, y), drifting as it goes. */
+function drawSmoke(canvas: Canvas, x: number, y: number, tick: number): void {
+  for (let k = 0; k < 3; k++) {
+    const rise = (Math.floor(tick / 3) + k * 3) % 8
+    const sway = Math.round(Math.sin((tick + k * 9) / 6))
+    setPixel(canvas, x + sway + Math.floor(rise / 3), y - 1 - rise, mix(P.stoneLight, P.white, rise / 8))
+  }
+}
+
+/**
+ * What drifts through the air: petals in spring, leaves in autumn, snow in
+ * winter. Each flake keeps its own column and pace, so the drift looks loose.
+ */
+function drawDrift(canvas: Canvas, season: Season, tick: number, seed: number, camera: number): void {
+  const color = SEASON_DRIFT[season]
+  if (color === undefined) return
+  const GROUND = groundOf(canvas)
+  const isSnow = season === 'winter'
+  const count = Math.ceil((canvas.width / 100) * (isSnow ? 14 : 5))
+  const span = canvas.width + 16
+  for (let i = 0; i < count; i++) {
+    const speed = (isSnow ? 0.18 : 0.12) + hash01(seed + 51, i) * 0.1
+    const fall = hash01(seed + 52, i) * GROUND + tick * speed
+    const y = Math.floor(fall % GROUND)
+    const lap = Math.floor(fall / GROUND)
+    const drift = hash01(seed + 53, i + lap * 977) * span + tick * 0.05 - camera / 3
+    const x = Math.round((((drift + Math.sin((tick + i * 7) / 9) * 1.5) % span) + span) % span) - 8
+    setPixel(canvas, x, y, color)
+  }
+}
+
+/** Fireflies over the grass on a summer night, each glowing and fading on its own. */
+function drawFireflies(canvas: Canvas, tick: number, seed: number, camera: number): void {
+  const GROUND = groundOf(canvas)
+  const count = Math.ceil(canvas.width / 16)
+  for (let i = 0; i < count; i++) {
+    if (Math.floor(tick / 4 + hash01(seed + 61, i) * 8) % 8 > 2) continue
+    const x = Math.round(((hash01(seed + 62, i) * canvas.width * 2 - camera / 2 + Math.sin((tick + i * 13) / 11) * 3) % canvas.width + canvas.width) % canvas.width)
+    const y = GROUND - 2 - Math.floor(hash01(seed + 63, i) * 5) + Math.round(Math.sin((tick + i * 5) / 7))
+    setPixel(canvas, x, y, P.sprout)
+  }
+}
+
 /** Rows a felled tree leaves standing: its stump. */
 const STUMP_ROWS = 3
 
@@ -229,7 +299,15 @@ const STUMP_ROWS = 3
  * Draws a tree turned about the top of its stump by `angle` radians (positive
  * leans right), sampling the sprite backwards so no pixel is left as a hole.
  */
-function drawTreeTurned(canvas: Canvas, art: Sprite, x: number, y: number, angle: number, groundY: number): void {
+function drawTreeTurned(
+  canvas: Canvas,
+  art: Sprite,
+  x: number,
+  y: number,
+  angle: number,
+  groundY: number,
+  recolor: ReadonlyMap<number, number>,
+): void {
   const pivotX = Math.floor(art.width / 2)
   const pivotY = art.height - STUMP_ROWS
   const originX = x + pivotX
@@ -247,13 +325,13 @@ function drawTreeTurned(canvas: Canvas, art: Sprite, x: number, y: number, angle
       const sy = Math.round(-dx * sin + dy * cos) + pivotY
       if (sx < 0 || sy < 0 || sx >= art.width || sy >= pivotY) continue
       const color = art.pixels[sy * art.width + sx]!
-      if (color !== CLEAR) setPixel(canvas, originX + dx, py, color)
+      if (color !== CLEAR) setPixel(canvas, originX + dx, py, recolor.get(color) ?? color)
     }
   }
 }
 
 /** A plot in the middle of a job: a tree falling or felled, a boulder cracked or broken. */
-function drawEffect(canvas: Canvas, effect: Effect, plot: Plot, x0: number, tick: number): void {
+function drawEffect(canvas: Canvas, effect: Effect, plot: Plot, x0: number, tick: number, season: Season): void {
   const GROUND = groundOf(canvas)
   const centered = (sprite: Sprite): number => x0 + Math.floor((PLOT - sprite.width) / 2)
   if (effect.kind === 'falling' || effect.kind === 'felled') {
@@ -263,7 +341,7 @@ function drawEffect(canvas: Canvas, effect: Effect, plot: Plot, x0: number, tick
     // It tips slowly, then gathers speed until it hits the ground.
     const t = effect.kind === 'felled' ? 1 : Math.min(1, (tick - effect.start) / FALL_TICKS)
     const angle = (Math.PI / 2) * t * t * (effect.towardLeft ? -1 : 1)
-    drawTreeTurned(canvas, art, centered(art), bottomY(canvas, art), angle, GROUND)
+    drawTreeTurned(canvas, art, centered(art), bottomY(canvas, art), angle, GROUND, SEASON_LEAVES[season])
     return
   }
   if (plot.kind === 'rock' && effect.kind === 'cracked') {
@@ -323,7 +401,8 @@ export function renderFrame(
 ): Canvas {
   const palette = style.palette ?? 'color'
   // Line art reads best by daylight; night would turn it to solid ink.
-  const sky = skyFor(isMono(palette) ? 12 : time.hour)
+  const season = seasonOf(village)
+  const sky = seasonSky(skyFor(isMono(palette) ? 12 : time.hour), season)
   const canvas = createCanvas(width, style.height ?? SCENE_HEIGHTS.medium)
   const GROUND = groundOf(canvas)
   const camera = Math.round(plotCenter(village.camp) - width / 2)
@@ -344,8 +423,8 @@ export function renderFrame(
     const effect = inside ? scene.effects.get(index) : undefined
     const shake = inside && plot.kind === 'tree' && isWorked(scene, index) ? (Math.floor(tick / 3) % 2 === 0 ? 1 : -1) : 0
     const look = plot.kind === 'building' ? lookOf(village, index, plot) : undefined
-    if (effect) drawEffect(canvas, effect, plot, x0, tick)
-    else drawPlot(canvas, plot, x0, village.seed, index, shake, tick, look)
+    if (effect) drawEffect(canvas, effect, plot, x0, tick, season)
+    else drawPlot(canvas, plot, x0, village.seed, index, shake, tick, season, look)
     if (plot.kind === 'building' && look && plot.progress >= BUILDINGS[plot.building].steps) {
       const art = BUILDING_ART[plot.building]
       lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
@@ -363,6 +442,7 @@ export function renderFrame(
     drawVillager(canvas, w.x - camera, GROUND + 2 - VILLAGER_HEIGHT + w.hop, w.pose, w.tunic, w.facingLeft)
   }
   drawChips(canvas, scene, camera)
+  drawDrift(canvas, season, tick, village.seed, camera)
 
   nightShade(canvas, background, sky, fireX)
   if (sky.dim > 0) {
@@ -371,6 +451,7 @@ export function renderFrame(
     if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(canvas, fire), { only: P.fire })
     if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(canvas, fire), { only: P.fireCore })
     for (const { sprite, x, y, flip } of lit) drawSprite(canvas, sprite, x, y, { only: P.window, flip })
+    if (sky.stars && season === 'summer') drawFireflies(canvas, tick, village.seed, camera)
   }
   if (palette === 'grayscale') return toGrayscale(canvas)
   if (palette === 'mono-dark') return invertMonochrome(toMonochrome(canvas, background, GROUND))

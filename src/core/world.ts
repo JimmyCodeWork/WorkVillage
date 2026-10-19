@@ -11,6 +11,7 @@ import {
   PROPS,
   REWARDS,
   ROOFS,
+  SEASON_ACTIONS,
   WORLD,
   type BuildingKind,
   type PropStyle,
@@ -166,6 +167,17 @@ export function createVillage(seed: number, now: number, found: { roofs: readonl
     createdAt: now,
     kit,
   }
+}
+
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter'
+const SEASONS: readonly Season[] = ['spring', 'summer', 'autumn', 'winter']
+
+/**
+ * The village's season. It turns with the work done, not the calendar, so a
+ * year passes in a few hours of work and stands still while nobody works.
+ */
+export function seasonOf(village: Village): Season {
+  return SEASONS[Math.floor(village.stats.actions / SEASON_ACTIONS) % SEASONS.length]!
 }
 
 export function stageOf(village: Village): Stage {

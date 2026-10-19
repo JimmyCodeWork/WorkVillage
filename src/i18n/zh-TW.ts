@@ -38,7 +38,11 @@ export const zhTW: Messages = {
   'stat.tasks': '已完成任務',
   'stat.turns': '對話回合',
 
-  'summary.line': '{stage}・村民 {villagers}・木材 {wood}・石材 {stone}・糧食 {food}',
+  'summary.line': '{stage}・{season}・村民 {villagers}・木材 {wood}・石材 {stone}・糧食 {food}',
+  'season.spring': '春',
+  'season.summer': '夏',
+  'season.autumn': '秋',
+  'season.winter': '冬',
   'summary.next': '下一個建設：{building}（木材 {wood}、石材 {stone}）',
   'summary.building': '建設中：{building} {percent}%',
   'pane.stats': '開發活動',

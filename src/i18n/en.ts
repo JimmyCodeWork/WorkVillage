@@ -36,7 +36,11 @@ export const en = {
   'stat.tasks': 'Completed tasks',
   'stat.turns': 'Turns',
 
-  'summary.line': '{stage} · {villagers} villagers · Timber {wood} · Stone {stone} · Food {food}',
+  'summary.line': '{stage} · {season} · {villagers} villagers · Timber {wood} · Stone {stone} · Food {food}',
+  'season.spring': 'Spring',
+  'season.summer': 'Summer',
+  'season.autumn': 'Autumn',
+  'season.winter': 'Winter',
   'summary.next': 'Next: {building} ({wood} timber, {stone} stone)',
   'summary.building': 'Building: {building} {percent}%',
   'pane.stats': 'Activity',

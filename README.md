@@ -57,6 +57,15 @@ Each costs timber and stone and takes several steps of work to finish. When the 
 camp are gone, the clearing extends further into the forest. The sky follows your local time,
 and at night the villagers gather around the fire.
 
+The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
+and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves
+in autumn, and snow on the roofs and smoke from the chimneys in winter. The season is shown in the
+row above the village.
+
+| Spring | Summer | Autumn | Winter |
+| --- | --- | --- | --- |
+| ![Spring](docs/images/07-spring.png) | ![Summer](docs/images/07-summer.png) | ![Autumn](docs/images/07-autumn.png) | ![Winter](docs/images/07-winter.png) |
+
 Failed tool calls never cost you anything: the village only ever grows.
 
 ### Every village is its own

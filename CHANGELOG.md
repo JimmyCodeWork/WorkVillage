@@ -24,6 +24,11 @@
   village's next buildings. `/village stats` and the `/village` pane list the styles found so far
   and count those still to find, without saying how; they are left for work to turn up. On a device with villages already,
   the lifetime record starts from their work, so styles that work has earned are found at once.
+- The seasons turn with the work done rather than the calendar, so a year passes in a few hours of
+  work and stands still while nobody works. Spring brings blossom and drifting petals, summer lush
+  grass and fireflies at night, autumn golden fields and falling leaves, and winter snow on the
+  ground and roofs, falling snow and smoke from the chimneys. The row above the village names the
+  season.
 - Fixed: when the clearing grew on the left, jobs already waiting could be worked on the wrong plot.
 - Saved villages are now checked field by field when they load, so a damaged save or a malformed
   code is refused instead of drawn.

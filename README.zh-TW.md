@@ -54,6 +54,13 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 每棟建築需消耗木材與石材，並經過數個施工階段才會落成。營地附近的樹木伐盡後，
 開墾範圍會向森林延伸。天色會依照本機時間變化，入夜後村民會圍坐在營火旁。
 
+四季隨工作推進，而非依照日曆：數小時的工作就會走過一年，離開時季節也會暫停。
+春天樹上開花，夏夜有螢火蟲，秋天落葉紛飛，冬天屋頂積雪、煙囪冒煙。目前的季節會顯示在村莊上方的資源列。
+
+| 春 | 夏 | 秋 | 冬 |
+| --- | --- | --- | --- |
+| ![春](docs/images/07-spring.png) | ![夏](docs/images/07-summer.png) | ![秋](docs/images/07-autumn.png) | ![冬](docs/images/07-winter.png) |
+
 工具呼叫失敗不會造成任何損失：村莊只會持續成長。
 
 ### 每座村莊都獨一無二

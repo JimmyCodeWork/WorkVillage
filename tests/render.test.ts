@@ -174,3 +174,25 @@ describe('work', () => {
     expect(crew).toBe(1)
   })
 })
+
+describe('seasons', () => {
+  const inSeason = (n: number) => {
+    const v = createVillage(1, 0)
+    return { ...v, stats: { ...v.stats, actions: n * 40 } }
+  }
+  const grassRow = (n: number) => {
+    const frame = renderFrame(inSeason(n), createScene(inSeason(n)), 80, { hour: 12 }, { height: 20 })
+    return Array.from(frame.pixels.slice(16 * 80, 17 * 80))
+  }
+
+  test('winter lays snow on the ground, autumn turns it gold', () => {
+    const spring = grassRow(0)
+    const autumn = grassRow(2)
+    const winter = grassRow(3)
+    const isSnow = (c: number) => ((c >> 16) & 255) > 200 && ((c >> 8) & 255) > 200 && (c & 255) > 200
+    expect(winter.filter(isSnow).length).toBeGreaterThan(winter.length / 2)
+    // In spring only a birch trunk or the fire's core is that bright.
+    expect(spring.filter(isSnow).length).toBeLessThan(spring.length / 10)
+    expect(autumn).not.toEqual(spring)
+  })
+})

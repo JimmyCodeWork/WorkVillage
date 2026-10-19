@@ -2,6 +2,8 @@
 // drawn for WorkVillage and released under the project's licence.
 
 import type { RoofStyle } from '../core/balance'
+import type { Season } from '../core/world'
+import { mix } from '../pixel/canvas'
 
 export const P = {
   outline: 0x2a2433,
@@ -175,3 +177,63 @@ export function skyFor(hour: number): Sky {
   if (hour >= 5 && hour < 7) return DAWN
   return NIGHT
 }
+
+const SNOW = 0xe9eff5
+const NIGHT_INK = 0x0d1328
+
+/**
+ * The season's turn on the ground and hills: lusher in summer, gold in
+ * autumn, under snow in winter. Colours put in whole are darkened by the
+ * hour as the sky's own are.
+ */
+export function seasonSky(sky: Sky, season: Season): Sky {
+  const byHour = (color: number): number => mix(color, NIGHT_INK, sky.dim)
+  switch (season) {
+    case 'spring':
+      return { ...sky, grassLight: mix(sky.grassLight, byHour(0xa8d86a), 0.4) }
+    case 'summer':
+      return { ...sky, grass: mix(sky.grass, byHour(0x3f7f2e), 0.4) }
+    case 'autumn':
+      return {
+        ...sky,
+        grass: mix(sky.grass, byHour(0xa8862e), 0.7),
+        grassLight: mix(sky.grassLight, byHour(0xd8a33a), 0.7),
+        hillFar: mix(sky.hillFar, byHour(0xc09a5a), 0.4),
+        hillNear: mix(sky.hillNear, byHour(0xb0803e), 0.4),
+      }
+    case 'winter':
+      return {
+        ...sky,
+        grass: byHour(SNOW),
+        grassLight: byHour(P.white),
+        hillFar: mix(sky.hillFar, byHour(SNOW), 0.8),
+        hillNear: mix(sky.hillNear, byHour(SNOW), 0.7),
+      }
+  }
+}
+
+/** Leaves through the year: blossom in spring, turning in autumn, snow-laden in winter. */
+export const SEASON_LEAVES: Readonly<Record<Season, ReadonlyMap<number, number>>> = {
+  spring: new Map([[P.leafLight, 0xf4c2d0]]),
+  summer: new Map(),
+  autumn: new Map([
+    [P.leafDark, 0x9a4a22],
+    [P.leaf, 0xd0782e],
+    [P.leafLight, 0xeec04a],
+  ]),
+  winter: new Map([
+    [P.leafDark, 0x9aa6b4],
+    [P.leaf, 0xcfd8e2],
+    [P.leafLight, P.white],
+    [P.pineLight, P.white],
+  ]),
+}
+
+/** What drifts through the air in each season, if anything. */
+export const SEASON_DRIFT: Readonly<Record<Season, number | undefined>> = {
+  spring: 0xf4c2d0,
+  summer: undefined,
+  autumn: 0xd0782e,
+  winter: P.white,
+}
+

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { BUILDINGS } from '../src/core/balance'
-import { applySignal, createVillage, restore, stageOf, withStyles, type Signal, type Village } from '../src/core/world'
+import { BUILDINGS, SEASON_ACTIONS } from '../src/core/balance'
+import { applySignal, createVillage, restore, seasonOf, stageOf, withStyles, type Signal, type Village } from '../src/core/world'
 
 function run(village: Village, signals: readonly Signal[]): Village {
   return signals.reduce((v, s) => applySignal(v, s).village, village)
@@ -158,5 +158,22 @@ describe('looks', () => {
     const index = v.plots.findIndex((p: { kind: string }) => p.kind === 'building')
     v.plots[index].look = { roof: 'classic', prop: 'cannon', mirrored: false }
     expect(restore(v)).toBeUndefined()
+  })
+})
+
+describe('seasons', () => {
+  test('the seasons turn with the work done, starting in spring', () => {
+    const at = (actions: number) => seasonOf({ ...createVillage(1, 0), stats: { ...createVillage(1, 0).stats, actions } })
+    expect(at(0)).toBe('spring')
+    expect(at(SEASON_ACTIONS - 1)).toBe('spring')
+    expect(at(SEASON_ACTIONS)).toBe('summer')
+    expect(at(SEASON_ACTIONS * 2)).toBe('autumn')
+    expect(at(SEASON_ACTIONS * 3)).toBe('winter')
+    expect(at(SEASON_ACTIONS * 4)).toBe('spring')
+  })
+
+  test('turns alone do not move the seasons', () => {
+    const v = run(createVillage(1, 0), Array.from({ length: SEASON_ACTIONS * 2 }, () => 'turn' as const))
+    expect(seasonOf(v)).toBe('spring')
   })
 })

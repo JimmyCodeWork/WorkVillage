@@ -97,3 +97,6 @@ export const UNLOCKS: readonly Unlock[] = [
 
 /** Share of a village's buildings raised in its own colour. */
 export const ACCENT_SHARE = 0.5
+
+/** Actions (signals other than turns) a season lasts; a year is four of them. */
+export const SEASON_ACTIONS = 40

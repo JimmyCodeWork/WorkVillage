@@ -23,6 +23,7 @@ import {
   createVillage,
   isComplete,
   restore,
+  seasonOf,
   stageOf,
   type Milestone,
   type Signal,
@@ -177,6 +178,7 @@ function summary(): string {
   const r = rt.village.resources
   return rt.t('summary.line', {
     stage: rt.t(`stage.${stageOf(rt.village)}`),
+    season: rt.t(`season.${seasonOf(rt.village)}`),
     villagers: rt.village.villagers,
     wood: r.wood,
     stone: r.stone,
