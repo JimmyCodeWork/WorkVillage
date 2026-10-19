@@ -428,3 +428,30 @@ test('/village stats counts the work of every project on the device', async ($, 
   const text = (await $.command.run({ command: 'village', args: 'stats' } as never)).text
   expect(text).toMatch(/All projects on this device \(2 villages\): Edits 101 .* Commits 7/)
 })
+
+test('work that finds a new style says so', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on, {
+    profile: {
+      version: 1,
+      lifetime: { edits: 0, reads: 0, tests: 0, commits: 9, tasks: 0, turns: 0, actions: 9, thoughts: 0 },
+      villages: {},
+      createdAt: 0,
+    },
+  })
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/styles' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  const toasts: string[] = []
+  on('ui.toast', (_$, e) => {
+    toasts.push(String(e.text))
+    return { value: undefined }
+  })
+  on('tool.call', () => ({ result: { stdout: '', stderr: '', interrupted: false } as never }))
+
+  await $.session.start({ cwd: '/work/styles', surface: 'terminal', isInteractive: true })
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "work"' } as never)
+  await $.command.run({ command: 'village', args: 'stats' } as never)
+  expect(toasts.some(text => /new style, Lanterns/.test(text))).toBe(true)
+})

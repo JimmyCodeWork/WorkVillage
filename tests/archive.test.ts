@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { decodeArchive, encodeArchive, type Archive } from '../src/core/archive'
-import { createProfile, recordWork, restoreProfile, statsDelta } from '../src/core/profile'
+import { createProfile, foundStyles, newlyFound, profileFrom, recordWork, restoreProfile, statsDelta } from '../src/core/profile'
 import { applySignal, createVillage, restore, type Signal, type Village } from '../src/core/world'
 
 function grown(seed: number, count: number): Village {
@@ -97,5 +97,22 @@ describe('the device-wide record', () => {
     const profile = JSON.parse(JSON.stringify(createProfile(0)))
     profile.villages = JSON.parse('{"__proto__": {"stage": "camp", "villagers": 1, "built": 0, "updatedAt": 0}}')
     expect(restoreProfile(profile)).toBeUndefined()
+  })
+})
+
+describe('styles found by work', () => {
+  const lifetime = (over: Partial<Record<string, number>>) => ({ ...createProfile(0).lifetime, ...over })
+
+  test('work across the device finds new styles', () => {
+    expect(foundStyles(lifetime({}))).toEqual({ roofs: [], props: [] })
+    expect(foundStyles(lifetime({ commits: 30, edits: 200 }))).toEqual({ roofs: ['slate', 'moss'], props: ['lantern'] })
+    expect(newlyFound(lifetime({ commits: 9 }), lifetime({ commits: 10 })).map(u => u.style)).toEqual(['lantern'])
+    expect(newlyFound(lifetime({ commits: 10 }), lifetime({ commits: 11 }))).toEqual([])
+  })
+
+  test('a record begun on a device with villages starts from their work', () => {
+    const a = grown(1, 20)
+    const b = grown(2, 30)
+    expect(profileFrom([a, b], 0).lifetime.edits).toBe(a.stats.edits + b.stats.edits)
   })
 })

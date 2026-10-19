@@ -2,6 +2,7 @@
 // project keeps its own village; this keeps the lifetime totals and a short
 // summary of each village, and only ever grows by the work done.
 
+import { UNLOCKS, type PropStyle, type RoofStyle, type Unlock } from './balance'
 import { builtCount, stageOf, type Stage, type Stats, type Village } from './world'
 
 export type VillageSummary = {
@@ -112,3 +113,27 @@ export function restoreProfile(value: unknown): Profile | undefined {
   }
   return { version: 1, lifetime, villages, createdAt: p.createdAt }
 }
+
+/** The styles the work on this device has found so far. */
+export function foundStyles(lifetime: Stats): { roofs: RoofStyle[]; props: PropStyle[] } {
+  const found = UNLOCKS.filter(u => lifetime[u.stat] >= u.at)
+  return {
+    roofs: found.flatMap(u => (u.kind === 'roof' ? [u.style] : [])),
+    props: found.flatMap(u => (u.kind === 'prop' ? [u.style] : [])),
+  }
+}
+
+/** The styles found between two states of the record, in the order they are found. */
+export function newlyFound(before: Stats, after: Stats): Unlock[] {
+  return UNLOCKS.filter(u => before[u.stat] < u.at && after[u.stat] >= u.at)
+}
+
+/**
+ * A record begun on a device that already has villages starts from their
+ * work, so styles that work has earned are found at once.
+ */
+export function profileFrom(villages: readonly Village[], now: number): Profile {
+  const profile = createProfile(now)
+  return { ...profile, lifetime: villages.reduce((sum, v) => addStats(sum, v.stats), profile.lifetime) }
+}
+

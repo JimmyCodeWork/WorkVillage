@@ -1,8 +1,15 @@
 // Composes one frame of the village: sky, hills, ground, plots, villagers.
 
-import { P, skyFor, type Sky } from '../art/palette'
+import { P, ROOF_COLORS, skyFor, type Sky } from '../art/palette'
 import {
+  BANNER,
+  BARREL,
+  BENCH,
   CAMPFIRE,
+  CRATE,
+  FLOWER_POT,
+  LANTERN,
+  WOODPILE,
   CLOUD,
   CROPS,
   EMBERS,
@@ -23,9 +30,9 @@ import {
   WORKSHOP,
 } from '../art/sprites'
 import { drawVillager, VILLAGER_HEIGHT } from '../art/villager'
-import type { BuildingKind } from '../core/balance'
+import type { BuildingKind, PropStyle } from '../core/balance'
 import { BUILDINGS } from '../core/balance'
-import { hash01, wildPlot, type Plot, type Village } from '../core/world'
+import { hash01, wildPlot, type Look, type Plot, type Village } from '../core/world'
 import { invertMonochrome, isMono, toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
 import { CLEAR, createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
 import { FALL_TICKS, isWorked, plotCenter, PLOT, type Chip, type Effect, type Scene } from './sim'
@@ -51,6 +58,36 @@ const BUILDING_ART: Readonly<Record<BuildingKind, Sprite>> = {
   house: HOUSE,
   workshop: WORKSHOP,
   tower: TOWER,
+}
+
+const PROP_ART: Readonly<Record<Exclude<PropStyle, 'none'>, Sprite>> = {
+  barrel: BARREL,
+  crate: CRATE,
+  woodpile: WOODPILE,
+  flowers: FLOWER_POT,
+  lantern: LANTERN,
+  bench: BENCH,
+  banner: BANNER,
+}
+
+/**
+ * How a building looks: as chosen when it was placed, or, for one raised
+ * before buildings had looks, picked from the village's kit by where it stands.
+ */
+function lookOf(village: Village, index: number, plot: Plot): Look {
+  if (plot.kind === 'building' && plot.look) return plot.look
+  const at = index - village.camp
+  const { kit, seed } = village
+  return {
+    roof: hash01(seed + 31, at) < 0.5 ? kit.accent : kit.roofs[Math.floor(hash01(seed + 37, at) * kit.roofs.length)]!,
+    prop: kit.props[Math.floor(hash01(seed + 41, at) * kit.props.length)]!,
+    mirrored: hash01(seed + 43, at) < 0.5,
+  }
+}
+
+/** Where a building's decoration stands: at the corner of its plot, away from the way it faces. */
+function propAt(look: Look, x0: number, art: Sprite): number {
+  return look.mirrored ? x0 : x0 + PLOT - art.width
 }
 
 export type FrameTime = {
@@ -124,6 +161,7 @@ function drawPlot(
   index: number,
   shake: number,
   tick: number,
+  look?: Look,
 ): void {
   const GROUND = groundOf(canvas)
   const centered = (sprite: Sprite): number => x0 + Math.floor((PLOT - sprite.width) / 2)
@@ -162,11 +200,16 @@ function drawPlot(
       const done = plot.progress >= total
       const x = centered(art)
       const y = bottomY(canvas, art)
+      const style = { recolor: look ? ROOF_COLORS[look.roof] : undefined, flip: look?.mirrored }
       if (done) {
-        drawSprite(canvas, art, x, y)
+        drawSprite(canvas, art, x, y, style)
+        if (look && look.prop !== 'none' && plot.building !== 'well') {
+          const prop = PROP_ART[look.prop]
+          drawSprite(canvas, prop, propAt(look, x0, prop), GROUND + 1 - prop.height, style)
+        }
       } else {
         const reveal = Math.max(0.12, plot.progress / total)
-        drawSprite(canvas, art, x, y, { reveal })
+        drawSprite(canvas, art, x, y, { ...style, reveal })
         // Scaffolding around the unfinished part.
         for (let sy = y; sy <= GROUND; sy++) {
           setPixel(canvas, x - 1, sy, P.woodDark)
@@ -293,18 +336,22 @@ export function renderFrame(
 
   const first = Math.floor(camera / PLOT) - 1
   const last = Math.ceil((camera + width) / PLOT) + 1
-  const lit: { sprite: Sprite; x: number; y: number }[] = []
+  const lit: { sprite: Sprite; x: number; y: number; flip: boolean }[] = []
   for (let index = first; index <= last; index++) {
     const inside = index >= 0 && index < village.plots.length
     const plot = inside ? (scene.holds.get(index) ?? village.plots[index]!) : wildPlot(village.seed, index - village.camp)
     const x0 = index * PLOT - camera
     const effect = inside ? scene.effects.get(index) : undefined
     const shake = inside && plot.kind === 'tree' && isWorked(scene, index) ? (Math.floor(tick / 3) % 2 === 0 ? 1 : -1) : 0
+    const look = plot.kind === 'building' ? lookOf(village, index, plot) : undefined
     if (effect) drawEffect(canvas, effect, plot, x0, tick)
-    else drawPlot(canvas, plot, x0, village.seed, index, shake, tick)
-    if (plot.kind === 'building' && plot.progress >= BUILDINGS[plot.building].steps) {
+    else drawPlot(canvas, plot, x0, village.seed, index, shake, tick, look)
+    if (plot.kind === 'building' && look && plot.progress >= BUILDINGS[plot.building].steps) {
       const art = BUILDING_ART[plot.building]
-      lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art) })
+      lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
+      if (look.prop === 'lantern' && plot.building !== 'well') {
+        lit.push({ sprite: LANTERN, x: propAt(look, x0, LANTERN), y: GROUND + 1 - LANTERN.height, flip: false })
+      }
     }
   }
 
@@ -323,7 +370,7 @@ export function renderFrame(
     const fire = sky.stars ? CAMPFIRE[Math.floor(tick / 2) % CAMPFIRE.length]! : EMBERS
     if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(canvas, fire), { only: P.fire })
     if (sky.stars) drawSprite(canvas, fire, fireX - Math.floor(fire.width / 2), bottomY(canvas, fire), { only: P.fireCore })
-    for (const { sprite, x, y } of lit) drawSprite(canvas, sprite, x, y, { only: P.window })
+    for (const { sprite, x, y, flip } of lit) drawSprite(canvas, sprite, x, y, { only: P.window, flip })
   }
   if (palette === 'grayscale') return toGrayscale(canvas)
   if (palette === 'mono-dark') return invertMonochrome(toMonochrome(canvas, background, GROUND))

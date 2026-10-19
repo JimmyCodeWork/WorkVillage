@@ -5,8 +5,10 @@ import type { WorkvillageTransfer } from '../types'
 import { decodeArchive, encodeArchive, type Archive } from '../src/core/archive'
 import { BUILD_ORDER, BUILDINGS } from '../src/core/balance'
 import {
-  createProfile,
+  foundStyles,
   isVillageKey,
+  newlyFound,
+  profileFrom,
   recordWork,
   restoreProfile,
   statsDelta,
@@ -14,6 +16,7 @@ import {
   VILLAGE_KEY_PREFIX,
   type Profile,
 } from '../src/core/profile'
+import type { Unlock } from '../src/core/balance'
 import {
   applySignal,
   builtCount,
@@ -25,6 +28,7 @@ import {
   type Signal,
   type Stats,
   type Village,
+  withStyles,
 } from '../src/core/world'
 import { resolveLocale, translator, type MessageKey, type Translate } from '../src/i18n/index'
 import { toRasterCells, toRgba, toSvg } from '../src/pixel/encode'
@@ -224,8 +228,34 @@ function lifetimeText(profile: Profile): string {
   return `${rt.t('stat.lifetime', { villages: Object.keys(profile.villages).length })} ${statsText(profile.lifetime)}`
 }
 
+async function storedVillages($: EngineInterface): Promise<Record<string, Village>> {
+  const villages: Record<string, Village> = {}
+  for (const key of await $.store.keys()) {
+    const village = isVillageKey(key) ? restore(await $.store.get(key)) : undefined
+    if (village) villages[key] = village
+  }
+  return villages
+}
+
+/** The device's record; one begun now starts from the villages already on the device. */
 async function readProfile($: EngineInterface): Promise<Profile> {
-  return restoreProfile(await $.store.get(PROFILE_KEY)) ?? createProfile(await $.clock.now())
+  const stored = restoreProfile(await $.store.get(PROFILE_KEY))
+  return stored ?? profileFrom(Object.values(await storedVillages($)), await $.clock.now())
+}
+
+/** A fresh village for this project, with every style found so far. */
+async function freshVillage($: EngineInterface, seed: number): Promise<Village> {
+  return createVillage(seed, await $.clock.now(), foundStyles((await readProfile($)).lifetime))
+}
+
+/** A village with every style found on this device added to its kit. */
+async function withFound($: EngineInterface, village: Village): Promise<Village> {
+  const styles = foundStyles((await readProfile($)).lifetime)
+  return { ...village, kit: withStyles(village.kit, styles.roofs, styles.props) }
+}
+
+function styleName(unlock: Unlock): string {
+  return unlock.kind === 'roof' ? rt.t(`style.roof.${unlock.style}`) : rt.t(`style.prop.${unlock.style}`)
 }
 
 function scheduleSave($: EngineInterface): void {
@@ -243,11 +273,21 @@ function saveNow($: EngineInterface): Promise<void> {
   rt.saving = rt.saving
     .then(async () => {
       const village = rt.village
+      // Read first: a record begun now counts the villages as stored before this save.
+      const profile = await readProfile($)
       await $.store.set(rt.storeKey, village)
       const delta = statsDelta(rt.recorded, village.stats)
-      const profile = await readProfile($)
-      await $.store.set(PROFILE_KEY, recordWork(profile, rt.storeKey, village, delta, await $.clock.now()))
+      const next = recordWork(profile, rt.storeKey, village, delta, await $.clock.now())
+      await $.store.set(PROFILE_KEY, next)
       rt.recorded = village.stats
+      // Styles found by this work can turn up on this village's next buildings.
+      const found = newlyFound(profile.lifetime, next.lifetime)
+      if (found.length > 0) {
+        const styles = foundStyles(next.lifetime)
+        rt.village = { ...rt.village, kit: withStyles(rt.village.kit, styles.roofs, styles.props) }
+        await $.store.set(rt.storeKey, rt.village)
+        for (const unlock of found) $.ui.toast(rt.t('toast.found', { style: styleName(unlock) }))
+      }
     })
     .catch(() => undefined)
   return rt.saving
@@ -371,7 +411,8 @@ async function start($: EngineInterface): Promise<void> {
   rt.hasGraphics = await detectGraphics($)
   const root = await $.session.root()
   rt.storeKey = villageKey(root)
-  adopt(restore(await $.store.get(rt.storeKey)) ?? createVillage(seedFrom(root), await $.clock.now()))
+  const saved = restore(await $.store.get(rt.storeKey))
+  adopt(saved ? await withFound($, saved) : await freshVillage($, seedFrom(root)))
   rt.canUndoImport = (await $.store.get(BACKUP_KEY)) !== undefined
   rt.isReady = true
   await $.command.register({
@@ -447,12 +488,7 @@ async function say($: EngineInterface, notice: MessageKey | '', values: Record<s
 async function makeArchive($: EngineInterface, kind: Archive['kind']): Promise<Archive> {
   await saveNow($)
   if (kind === 'village') return { kind, village: rt.village }
-  const villages: Record<string, Village> = {}
-  for (const key of await $.store.keys()) {
-    const village = isVillageKey(key) ? restore(await $.store.get(key)) : undefined
-    if (village) villages[key] = village
-  }
-  return { kind, profile: await readProfile($), villages }
+  return { kind, profile: await readProfile($), villages: await storedVillages($) }
 }
 
 /** Copies an export code; where the clipboard does not take it, shows it to copy by hand. */
@@ -502,7 +538,8 @@ async function confirmImport($: EngineInterface): Promise<void> {
   await $.store.set(BACKUP_KEY, { at: await $.clock.now(), entries })
   rt.canUndoImport = true
   for (const [key, value] of Object.entries(incoming)) await $.store.set(key, value)
-  adopt(restore(await $.store.get(rt.storeKey)) ?? rt.village)
+  const imported = restore(await $.store.get(rt.storeKey))
+  adopt(imported ? await withFound($, imported) : rt.village)
   await saveNow($)
   await update($, revision, n => n + 1)
   await say($, 'data.imported')
@@ -520,7 +557,7 @@ async function undoImport($: EngineInterface): Promise<void> {
   await $.store.delete(BACKUP_KEY)
   rt.canUndoImport = false
   const root = rt.storeKey.slice(VILLAGE_KEY_PREFIX.length)
-  adopt(restore(await $.store.get(rt.storeKey)) ?? createVillage(seedFrom(root), await $.clock.now()))
+  adopt(restore(await $.store.get(rt.storeKey)) ?? (await freshVillage($, seedFrom(root))))
   await saveNow($)
   await update($, revision, n => n + 1)
   await say($, 'data.undone')
@@ -551,7 +588,7 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
       if (arg !== 'confirm') return { text: t('command.resetConfirm') }
       // The device-wide record keeps the work done; only this village starts over.
       await saveNow($)
-      adopt(createVillage(rt.village.seed, await $.clock.now()))
+      adopt(await freshVillage($, rt.village.seed))
       await saveNow($)
       await update($, revision, n => n + 1)
       return { text: t('command.reset') }

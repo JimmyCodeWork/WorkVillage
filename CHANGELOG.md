@@ -15,6 +15,14 @@
   a harvest. A helper carries the timber home, and a villager walking back empty-handed takes the next
   job straight away instead of first returning to the fire. Once a storehouse stands, timber and
   stone are carried there. At night everyone still gathers by the fire.
+- Every village is its own. Each grows a forest of its own and has a colour of its own; every
+  building is given a look when it is placed (its roof colour, which way it faces, and barrels, crates
+  or a woodpile beside it), and new buildings go up on either side of the camp. Buildings raised
+  before this release are given looks too.
+- More styles are found through work on every project on the device: slate, moss-green, terracotta
+  and plum roofs, and lanterns lit after dark, flower pots, benches and banners. A toast says when one
+  is found, and it can turn up on any village's next buildings. On a device with villages already,
+  the lifetime record starts from their work, so styles that work has earned are found at once.
 - Fixed: when the clearing grew on the left, jobs already waiting could be worked on the wrong plot.
 - Saved villages are now checked field by field when they load, so a damaged save or a malformed
   code is refused instead of drawn.

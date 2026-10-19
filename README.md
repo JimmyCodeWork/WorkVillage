@@ -59,6 +59,27 @@ and at night the villagers gather around the fire.
 
 Failed tool calls never cost you anything: the village only ever grows.
 
+### Every village is its own
+
+Each village grows a forest of its own and has a colour of its own, which about half its buildings
+are raised in. Every building is given its look when it is placed: the colour of its roof, which
+way it faces, and something set down beside it, such as barrels, crates or a woodpile. New
+buildings go up on either side of the camp, so no two villages are laid out alike.
+
+More styles are found through work on every project on the device. Once found, a style can turn up
+on any village's next buildings, and a toast says so.
+
+| Style | Found after |
+| --- | --- |
+| Lanterns, lit after dark | 10 commits |
+| Slate roofs | 150 edits |
+| Flower pots | 150 reads |
+| Moss-green roofs | 25 commits |
+| Benches | 15 completed tasks |
+| Terracotta roofs | 40 passing test runs |
+| Banners | 60 commits |
+| Plum roofs | 600 edits |
+
 ## Commands
 
 | Command | Description |

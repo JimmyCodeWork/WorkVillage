@@ -61,3 +61,39 @@ export const WORLD = {
   expandBy: 2,
   maxPlots: 40,
 } as const
+
+/** Roof colourings a building can be raised with; `classic` is the art as drawn. */
+export const ROOFS = ['classic', 'blue', 'slate', 'moss', 'terracotta', 'plum'] as const
+export type RoofStyle = (typeof ROOFS)[number]
+
+/** Small things set down beside a finished building; `none` leaves it bare. */
+export const PROPS = ['none', 'barrel', 'crate', 'woodpile', 'flowers', 'lantern', 'bench', 'banner'] as const
+export type PropStyle = (typeof PROPS)[number]
+
+type Lifetime = { edits: number; reads: number; tests: number; commits: number; tasks: number }
+
+export type Unlock =
+  | { kind: 'roof'; style: RoofStyle; stat: keyof Lifetime; at: number }
+  | { kind: 'prop'; style: PropStyle; stat: keyof Lifetime; at: number }
+
+/** Every village starts with these. */
+export const BASE_ROOFS: readonly RoofStyle[] = ['classic', 'blue']
+export const BASE_PROPS: readonly PropStyle[] = ['none', 'barrel', 'crate', 'woodpile']
+
+/**
+ * Styles found through work on every project on the device. Once found, a
+ * style can turn up on any village's next buildings.
+ */
+export const UNLOCKS: readonly Unlock[] = [
+  { kind: 'prop', style: 'lantern', stat: 'commits', at: 10 },
+  { kind: 'roof', style: 'slate', stat: 'edits', at: 150 },
+  { kind: 'prop', style: 'flowers', stat: 'reads', at: 150 },
+  { kind: 'roof', style: 'moss', stat: 'commits', at: 25 },
+  { kind: 'prop', style: 'bench', stat: 'tasks', at: 15 },
+  { kind: 'roof', style: 'terracotta', stat: 'tests', at: 40 },
+  { kind: 'prop', style: 'banner', stat: 'commits', at: 60 },
+  { kind: 'roof', style: 'plum', stat: 'edits', at: 600 },
+]
+
+/** Share of a village's buildings raised in its own colour. */
+export const ACCENT_SHARE = 0.5

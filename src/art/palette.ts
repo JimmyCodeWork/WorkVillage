@@ -1,6 +1,8 @@
 // WorkVillage's own palette. Every sprite in this project is original work
 // drawn for WorkVillage and released under the project's licence.
 
+import type { RoofStyle } from '../core/balance'
+
 export const P = {
   outline: 0x2a2433,
   skin: 0xe9b995,
@@ -50,6 +52,50 @@ export const P = {
   white: 0xf4f1e8,
   metal: 0xa9b0b8,
 } as const
+
+/**
+ * Each roof style as a recolouring of the art: tiles, thatch and tent canvas
+ * together, so one building reads as one style. `classic` keeps the art.
+ */
+export const ROOF_COLORS: Readonly<Record<RoofStyle, ReadonlyMap<number, number>>> = {
+  classic: new Map(),
+  blue: new Map([
+    [P.roof, 0x3f6f9e],
+    [P.roofDark, 0x2c4f73],
+    [P.canvas, 0xcfdcea],
+    [P.canvasShade, 0x9fb3c8],
+  ]),
+  slate: new Map([
+    [P.roof, 0x6b7280],
+    [P.roofDark, 0x4b5160],
+    [P.thatch, 0xc9b98a],
+    [P.thatchDark, 0x938456],
+    [P.canvas, 0xdcdcd6],
+    [P.canvasShade, 0xb0b0a8],
+  ]),
+  moss: new Map([
+    [P.roof, 0x5d8a4a],
+    [P.roofDark, 0x3f6234],
+    [P.thatch, 0xb9a95a],
+    [P.thatchDark, 0x857a3c],
+    [P.canvas, 0xd6e2c0],
+    [P.canvasShade, 0xa9b98f],
+  ]),
+  terracotta: new Map([
+    [P.roof, 0xc96a3a],
+    [P.roofDark, 0x96482a],
+    [P.thatch, 0xdba25a],
+    [P.thatchDark, 0xa9733a],
+    [P.canvas, 0xeed3b0],
+    [P.canvasShade, 0xc9a985],
+  ]),
+  plum: new Map([
+    [P.roof, 0x8a4f7a],
+    [P.roofDark, 0x613659],
+    [P.canvas, 0xe3d0e0],
+    [P.canvasShade, 0xbba2b8],
+  ]),
+}
 
 /** Tunic colours given to villagers in turn. */
 export const TUNICS: readonly number[] = [
