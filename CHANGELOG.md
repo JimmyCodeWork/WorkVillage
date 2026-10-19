@@ -19,9 +19,10 @@
   building is given a look when it is placed (its roof colour, which way it faces, and barrels, crates
   or a woodpile beside it), and new buildings go up on either side of the camp. Buildings raised
   before this release are given looks too.
-- More styles are found through work on every project on the device: slate, moss-green, terracotta
-  and plum roofs, and lanterns lit after dark, flower pots, benches and banners. A toast says when one
-  is found, and it can turn up on any village's next buildings. On a device with villages already,
+- More styles are found through work on every project on the device: other roof colours, and new
+  things to set beside a building. A toast says when one is found, and it can turn up on any
+  village's next buildings. `/village stats` and the `/village` pane list the styles found so far
+  and count those still to find, without saying how; they are left for work to turn up. On a device with villages already,
   the lifetime record starts from their work, so styles that work has earned are found at once.
 - Fixed: when the clearing grew on the left, jobs already waiting could be worked on the wrong plot.
 - Saved villages are now checked field by field when they load, so a damaged save or a malformed

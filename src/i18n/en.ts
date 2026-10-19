@@ -121,4 +121,10 @@ export const en = {
   'style.prop.lantern': 'Lanterns',
   'style.prop.bench': 'Benches',
   'style.prop.banner': 'Banners',
+
+  'collection.title': 'Styles found {found}/{total}:',
+  'collection.separator': ', ',
+  'collection.none': 'none yet.',
+  'collection.left': '· {left} still to find.',
+  'collection.complete': '· every style found.',
 }

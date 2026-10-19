@@ -123,4 +123,10 @@ export const zhTW: Messages = {
   'style.prop.lantern': '路燈',
   'style.prop.bench': '長椅',
   'style.prop.banner': '旗幟',
+
+  'collection.title': '已發現樣式 {found}/{total}：',
+  'collection.separator': '、',
+  'collection.none': '尚未發現。',
+  'collection.left': '・還有 {left} 種等待發現。',
+  'collection.complete': '・已發現所有樣式。',
 }

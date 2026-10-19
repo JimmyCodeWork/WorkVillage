@@ -452,6 +452,9 @@ test('work that finds a new style says so', async ($, on) => {
 
   await $.session.start({ cwd: '/work/styles', surface: 'terminal', isInteractive: true })
   await $.tool.call({ tool: 'Bash', command: 'git commit -m "work"' } as never)
-  await $.command.run({ command: 'village', args: 'stats' } as never)
+  const stats = (await $.command.run({ command: 'village', args: 'stats' } as never)).text ?? ''
   expect(toasts.some(text => /new style, Lanterns/.test(text))).toBe(true)
+  // Found styles are named; the rest are only counted, never how to find them.
+  expect(stats).toMatch(/Styles found 1\/8: Lanterns · 7 still to find\./)
+  expect(stats).not.toMatch(/Slate/)
 })

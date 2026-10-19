@@ -66,19 +66,10 @@ are raised in. Every building is given its look when it is placed: the colour of
 way it faces, and something set down beside it, such as barrels, crates or a woodpile. New
 buildings go up on either side of the camp, so no two villages are laid out alike.
 
-More styles are found through work on every project on the device. Once found, a style can turn up
-on any village's next buildings, and a toast says so.
-
-| Style | Found after |
-| --- | --- |
-| Lanterns, lit after dark | 10 commits |
-| Slate roofs | 150 edits |
-| Flower pots | 150 reads |
-| Moss-green roofs | 25 commits |
-| Benches | 15 completed tasks |
-| Terracotta roofs | 40 passing test runs |
-| Banners | 60 commits |
-| Plum roofs | 600 edits |
+More styles are found as you work on your projects: other roof colours, and new things to set
+beside a building. A toast says when one is found, and it can turn up on any village's next
+buildings. `/village stats` and the `/village` pane list the styles found so far; what is still to
+be found, and how, is left for your work to turn up.
 
 ## Commands
 
@@ -86,7 +77,7 @@ on any village's next buildings, and a toast says so.
 | --- | --- |
 | `/village` | Open the village pane with resources and activity |
 | `/village show` / `/village hide` | Show or hide the band above the prompt |
-| `/village stats` | Print the village's resources, your activity, and the totals for every project on this device |
+| `/village stats` | Print the village's resources, your activity, the totals for every project on this device and the styles found |
 | `/village settings` | Open the settings panel |
 | `/village reset confirm` | Return this project's village to wilderness |
 

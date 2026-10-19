@@ -16,7 +16,7 @@ import {
   VILLAGE_KEY_PREFIX,
   type Profile,
 } from '../src/core/profile'
-import type { Unlock } from '../src/core/balance'
+import { UNLOCKS, type Unlock } from '../src/core/balance'
 import {
   applySignal,
   builtCount,
@@ -126,6 +126,8 @@ type Runtime = {
   saving: Promise<void>
   /** The store holds what the last import replaced. */
   canUndoImport: boolean
+  /** The device's lifetime counts as last read, for the collection line. */
+  lifetime: Stats
   scene: Scene
   isReady: boolean
   /** The start in flight, so a draw that comes first can wait for it. */
@@ -160,6 +162,7 @@ const rt: Runtime = {
   recorded: createVillage(0, 0).stats,
   saving: Promise.resolve(),
   canUndoImport: false,
+  lifetime: createVillage(0, 0).stats,
   scene: createScene(createVillage(0, 0)),
   isReady: false,
   mounts: new Map(),
@@ -245,13 +248,30 @@ async function readProfile($: EngineInterface): Promise<Profile> {
 
 /** A fresh village for this project, with every style found so far. */
 async function freshVillage($: EngineInterface, seed: number): Promise<Village> {
-  return createVillage(seed, await $.clock.now(), foundStyles((await readProfile($)).lifetime))
+  rt.lifetime = (await readProfile($)).lifetime
+  return createVillage(seed, await $.clock.now(), foundStyles(rt.lifetime))
 }
 
 /** A village with every style found on this device added to its kit. */
 async function withFound($: EngineInterface, village: Village): Promise<Village> {
-  const styles = foundStyles((await readProfile($)).lifetime)
+  rt.lifetime = (await readProfile($)).lifetime
+  const styles = foundStyles(rt.lifetime)
   return { ...village, kit: withStyles(village.kit, styles.roofs, styles.props) }
+}
+
+/**
+ * The styles found so far, by name. What is still to be found is only
+ * counted: how to find it is left for work to turn up, not to be chased.
+ */
+function collectionText(): string {
+  const found = UNLOCKS.filter(u => rt.lifetime[u.stat] >= u.at)
+  const names = found.map(styleName).join(rt.t('collection.separator'))
+  const left = UNLOCKS.length - found.length
+  return [
+    rt.t('collection.title', { found: found.length, total: UNLOCKS.length }),
+    found.length > 0 ? names : rt.t('collection.none'),
+    left > 0 ? rt.t('collection.left', { left }) : rt.t('collection.complete'),
+  ].join(' ')
 }
 
 function styleName(unlock: Unlock): string {
@@ -280,6 +300,7 @@ function saveNow($: EngineInterface): Promise<void> {
       const next = recordWork(profile, rt.storeKey, village, delta, await $.clock.now())
       await $.store.set(PROFILE_KEY, next)
       rt.recorded = village.stats
+      rt.lifetime = next.lifetime
       // Styles found by this work can turn up on this village's next buildings.
       const found = newlyFound(profile.lifetime, next.lifetime)
       if (found.length > 0) {
@@ -583,7 +604,7 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
       return { text: t('command.settings') }
     case 'stats':
       await saveNow($)
-      return { text: `${summary()}\n${progressLine()}\n${statsText()}\n${lifetimeText(await readProfile($))}` }
+      return { text: [summary(), progressLine(), statsText(), lifetimeText(await readProfile($)), collectionText()].join('\n') }
     case 'reset':
       if (arg !== 'confirm') return { text: t('command.resetConfirm') }
       // The device-wide record keeps the work done; only this village starts over.
@@ -709,7 +730,7 @@ export const register: Register = (on, options) => {
     await ensureStarted($)
     const mount = layout(e.surface, e.props.bodyColumns, 'medium')
     rt.mounts.set(e.requestId, mount)
-    const lines = [summary(), progressLine(), statsText()]
+    const lines = [summary(), progressLine(), statsText(), collectionText()]
     if (e.surface === 'terminal') {
       const { Box, Text, Raster, Image } = $.ui.resolve(e)
       return (
