@@ -34,9 +34,11 @@
   fire. By day they now and then look in at home, and they come out in the morning, or at once when
   work comes in at night.
 - Ponds and fishing. The wild has ponds in it, frozen over in winter, and a village with none near
-  digs one where it clears a stump once it has a few buildings. When Claude finishes answering and
-  waits for you, a villager goes fishing for a little food: the float bobs, something bites, and the
+  digs one where it clears a stump once it has a few buildings. In quiet moments a villager goes
+  fishing for a little food: the float bobs, something bites, and the
   catch is held up, most often a fish. Work never waits on fishing; the line comes in for it.
+- The README no longer lists which kind of work does what; it describes the village growing with
+  the work as a whole, so nothing invites doing work for the village's sake.
 - Fixed: when the clearing grew on the left, jobs already waiting could be worked on the wrong plot.
 - Saved villages are now checked field by field when they load, so a damaged save or a malformed
   code is refused instead of drawn.

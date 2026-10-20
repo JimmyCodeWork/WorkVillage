@@ -35,19 +35,10 @@ Requires Claude Code 2.1.275 or later.
 
 ## How your work shapes the village
 
-| What happens in your session | What the villagers do |
-| --- | --- |
-| A file is edited | Fell a tree or clear a stump for **timber**, or work on the current building |
-| A new file is written | Quarry a boulder for **stone** |
-| Files are read or searched | Read by the fire for **knowledge**; now and then forage for food |
-| Claude thinks before answering, or hands work to a subagent | Ponder by the fire for more **knowledge** |
-| A test run passes | Plant, water and harvest fields for **food** |
-| A `git commit` succeeds | A milestone: a big push on the current building |
-| A to-do or task is completed | A new villager arrives, if there is a home for them |
-| Claude finishes answering and waits for you | Go fishing at the pond for **food** |
-
-Every 4 knowledge becomes a planned step on the building under way, so reading and thinking help
-the village grow too.
+The village grows with the work you and Claude do together. Editing, writing, reading, thinking,
+testing and committing all set villagers to work: felling trees, quarrying stone, tending fields
+and raising buildings, and the village gains new settlers as tasks are completed. There is no
+need to do anything for it; carry on with your project, and the village keeps pace.
 
 Villagers see each job through: a tree takes many blows of the axe, falls and is cut to length,
 and a boulder is struck until it cracks and breaks apart. Villagers with nothing to do lend a hand
@@ -60,10 +51,10 @@ Villagers with a home go in after dark, and its windows light up while someone i
 keeps the camp stays by the fire. By day they now and then look in at home, and work that comes in
 at night brings someone out of the house.
 
-The wild has ponds in it, and a village with none near digs one once it has a few buildings. While
-Claude waits for you, a villager goes fishing: the float bobs, something bites, and the villager
-holds up the catch, most often a fish, now and then something else. Work never waits on fishing;
-the line comes in when there is a job to do.
+The wild has ponds in it, and a village with none near digs one once it has a few buildings. In
+quiet moments a villager goes fishing: the float bobs, something bites, and the villager holds up
+the catch, most often a fish, now and then something else. Work never waits on fishing; the line
+comes in when there is a job to do.
 
 The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
 and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves
