@@ -300,5 +300,8 @@ export const CAUGHT_FISH = s(['.QQq.', 'QQQQq', '.QQq.'])
 export const CAUGHT_BOOT = s(['dd.', 'dd.', 'ddd'])
 export const CAUGHT_CHEST = s(['wWWw', 'dzzd', 'dddd'])
 
+/** The rooster that crows the village awake after a doze. */
+export const ROOSTER = s(['..x..', '..uuF', 'uuuu.', '.uuu.', '..j..'])
+
 export const FLOWER = s(['z', 'e'])
 export const TUFT = s(['m.m', '.m.'])

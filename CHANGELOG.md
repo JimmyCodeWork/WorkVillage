@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Events: now and then something happens in the village on its own.
+  - A bug may crawl out of the forest and scuttle about until the villagers catch it, which brings a
+    little knowledge. Nothing is ever lost to a bug.
+  - A villager may set out on an errand, walk out of sight and come back later with a sack of timber
+    and stone, or empty-handed if the errand came to nothing.
+  - After a long quiet the villagers doze off where they rest, with a Z drifting up now and then,
+    until the next work wakes the village: a rooster crows by the fire and everyone springs up.
+
 ## 0.3.0 - 2026-10-20
 
 - Villagers see each job through. Felling a tree takes many blows, with chips of wood flying, then

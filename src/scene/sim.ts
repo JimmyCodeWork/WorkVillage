@@ -12,7 +12,17 @@ export const PLOT = 12
 
 export const plotCenter = (index: number): number => index * PLOT + PLOT / 2
 
-type Phase = 'idle' | 'toWork' | 'working' | 'returning' | 'arriving' | 'goingIn' | 'inside'
+type Phase = 'idle' | 'toWork' | 'working' | 'returning' | 'arriving' | 'goingIn' | 'inside' | 'scouting' | 'away'
+
+/**
+ * A job a villager can be given: an action from the village, or one the
+ * scene starts itself, such as catching a bug.
+ */
+export type JobKind = ActionKind | 'catch'
+export type Job = { kind: JobKind; plot: number; before?: Plot; bug?: number }
+
+/** A bug let loose by a failed test run, crawling about until the tests pass and it is caught. */
+export type Bug = { id: number; x: number; dir: 1 | -1; isCaught: boolean }
 
 /** What comes up on the line: mostly a fish, now and then something else. */
 export type Catch = 'fish' | 'boot' | 'chest'
@@ -25,12 +35,14 @@ export type Walker = {
   facingLeft: boolean
   phase: Phase
   pose: Pose
-  action?: Action
+  action?: Job
   /** Which step of the job is under way, from the job's STEPS. */
   step: number
   targetX: number
   workLeft: number
-  carry?: 'log' | 'stone'
+  carry?: 'log' | 'stone' | 'sack'
+  /** When a scout out on an errand comes back with nothing, at the latest. */
+  awayUntil?: number
   restUntil: number
   hop: number
   /** The villager whose job this one is lending a hand with. */
@@ -58,7 +70,7 @@ export type Scene = {
   tick: number
   camp: number
   walkers: Walker[]
-  queue: Action[]
+  queue: Job[]
   holds: Map<number, Plot>
   effects: Map<number, Effect>
   chips: Chip[]
@@ -68,6 +80,11 @@ export type Scene = {
   beds: number[]
   /** Doors standing open, by plot, until the tick given. */
   doors: Map<number, number>
+  bugs: Bug[]
+  /** Nothing has happened for a while: the villagers doze where they rest. */
+  isDozing: boolean
+  /** When work woke the village from a doze, for the rooster and the start. */
+  wokeAt?: number
   nextId: number
   rand: () => number
 }
@@ -86,7 +103,7 @@ type Step = { ticks: number; effect?: Effect['kind'] }
  * tree is many blows, the fall, and then cutting the trunk to length; a
  * boulder is struck until it cracks, then broken up.
  */
-const STEPS: Readonly<Record<ActionKind, readonly Step[]>> = {
+const STEPS: Readonly<Record<JobKind, readonly Step[]>> = {
   chop: [{ ticks: 42 }, { ticks: FALL_TICKS + 4, effect: 'falling' }, { ticks: 18, effect: 'felled' }],
   clear: [{ ticks: 30 }],
   quarry: [{ ticks: 24 }, { ticks: 18, effect: 'cracked' }, { ticks: 10, effect: 'rubble' }],
@@ -101,10 +118,11 @@ const STEPS: Readonly<Record<ActionKind, readonly Step[]>> = {
   ponder: [{ ticks: 24 }],
   // Cast, wait for a bite (its length drawn at random), the bite, reeling in, holding up the catch.
   fish: [{ ticks: 8 }, { ticks: 60 }, { ticks: 8 }, { ticks: 10 }, { ticks: 16 }],
+  catch: [{ ticks: 10 }],
 }
 
 /** How many villagers can work one job together, the one who took it included. */
-const CREW: Readonly<Record<ActionKind, number>> = {
+const CREW: Readonly<Record<JobKind, number>> = {
   chop: 2,
   clear: 2,
   quarry: 2,
@@ -118,7 +136,17 @@ const CREW: Readonly<Record<ActionKind, number>> = {
   study: 1,
   ponder: 1,
   fish: 1,
+  catch: 1,
 }
+
+/** Most bugs about at once; more failed runs than this let loose no more. */
+export const MAX_BUGS = 3
+/** How far out a scout walks before it is out of sight on its errand. */
+const SCOUT_RANGE = 160
+/** A scout whose errand never ends comes back empty-handed after this many ticks. */
+const SCOUT_TIMEOUT = 4800
+/** Ticks the village takes to wake: the rooster crows, the villagers spring up. */
+export const WAKE_TICKS = 24
 
 /** Offset from a villager's box to its feet, for standing beside a plot. */
 const REACH = 9
@@ -134,6 +162,8 @@ export function createScene(village: Village, seed = village.seed): Scene {
     chips: [],
     beds: [],
     doors: new Map(),
+    bugs: [],
+    isDozing: false,
     nextId: 1,
     rand: random(seed ^ 0x5eed),
   }
@@ -179,14 +209,15 @@ export function syncScene(scene: Scene, village: Village): void {
       w.x += shift * PLOT
       w.targetX += shift * PLOT
     }
-    const moved = new Map<Action, Action>()
-    const move = (a: Action): Action => {
+    const moved = new Map<Job, Job>()
+    const move = (a: Job): Job => {
       if (!moved.has(a)) moved.set(a, { ...a, plot: a.plot + shift })
       return moved.get(a)!
     }
     scene.queue = scene.queue.map(move)
     for (const w of scene.walkers) if (w.action) w.action = move(w.action)
     for (const chip of scene.chips) chip.x += shift * PLOT
+    for (const bug of scene.bugs) bug.x += shift * PLOT
     scene.holds = shifted(scene.holds, shift)
     scene.effects = shifted(scene.effects, shift)
     scene.doors = shifted(scene.doors, shift)
@@ -238,11 +269,13 @@ export function enqueue(scene: Scene, action: Action, village: Village): void {
   while (scene.queue.length > MAX_QUEUE) {
     const dropped = scene.queue.shift()!
     scene.holds.delete(dropped.plot)
+    // A bug nobody got round to is caught all the same.
+    if (dropped.kind === 'catch') scene.bugs = scene.bugs.filter(b => b.id !== dropped.bug)
   }
 }
 
 /** Where a villager stands to work a plot: the side it comes from, or as a helper the other side. */
-function standFor(walker: Walker, action: Action, side?: 'left' | 'right', spread = 0): { x: number; facingLeft: boolean } {
+function standFor(walker: Walker, action: Job, side?: 'left' | 'right', spread = 0): { x: number; facingLeft: boolean } {
   const center = plotCenter(action.plot)
   const fromRight = side === undefined ? walker.x + 4 > center : side === 'right'
   if (action.kind === 'fish') {
@@ -254,7 +287,7 @@ function standFor(walker: Walker, action: Action, side?: 'left' | 'right', sprea
     : { x: center - REACH - 1 - spread, facingLeft: false }
 }
 
-function workPose(kind: ActionKind, step: number, beat: boolean): Pose {
+function workPose(kind: JobKind, step: number, beat: boolean): Pose {
   switch (kind) {
     case 'chop':
       // The tree's fall is watched, not worked.
@@ -272,6 +305,7 @@ function workPose(kind: ActionKind, step: number, beat: boolean): Pose {
     case 'plant':
     case 'harvest':
     case 'forage':
+    case 'catch':
       return 'kneel'
     case 'study':
       return 'read'
@@ -294,6 +328,7 @@ function walk(walker: Walker, tick: number): boolean {
   walker.x += Math.sign(dx) * SPEED
   if (walker.carry === 'log') walker.pose = 'carryLog'
   else if (walker.carry === 'stone') walker.pose = 'carryStone'
+  else if (walker.carry === 'sack') walker.pose = 'carrySack'
   else walker.pose = Math.floor(tick / 2) % 2 === 0 ? 'walk1' : 'walk2'
   return false
 }
@@ -365,6 +400,7 @@ function onBlow(scene: Scene, walker: Walker): void {
 /** The job is done: the plot shows what it has become, and the crew goes back. */
 function finish(scene: Scene, walker: Walker): void {
   const action = walker.action!
+  if (action.kind === 'catch') scene.bugs = scene.bugs.filter(b => b.id !== action.bug)
   scene.holds.delete(action.plot)
   scene.effects.delete(action.plot)
   const load = action.kind === 'chop' || action.kind === 'clear' ? 'log' : action.kind === 'quarry' ? 'stone' : undefined
@@ -435,6 +471,81 @@ export function occupied(scene: Scene): Set<number> {
   return new Set(scene.walkers.flatMap(w => (w.phase === 'inside' && w.home !== undefined ? [w.home] : [])))
 }
 
+/**
+ * A failed test run lets a bug loose at the edge of the clearing. Nothing
+ * is lost by it; it only waits to be caught.
+ */
+export function releaseBug(scene: Scene): void {
+  if (scene.bugs.length >= MAX_BUGS) return
+  const side = scene.rand() < 0.5 ? -1 : 1
+  scene.bugs.push({ id: scene.nextId++, x: campX(scene) + side * (30 + scene.rand() * 30), dir: side > 0 ? -1 : 1, isCaught: false })
+}
+
+/**
+ * The tests pass again: every bug about is caught by whoever is free. Says
+ * how many, for the village to reward.
+ */
+export function catchBugs(scene: Scene): number {
+  const loose = scene.bugs.filter(b => !b.isCaught)
+  for (const bug of loose) {
+    const plot = Math.round((bug.x - PLOT / 2) / PLOT)
+    bug.isCaught = true
+    bug.x = plotCenter(plot) - 1
+    scene.queue.unshift({ kind: 'catch', plot, bug: bug.id })
+  }
+  return loose.length
+}
+
+/**
+ * A subagent sets out: a villager with nothing to do walks out of sight on
+ * the errand. The one who keeps the camp stays.
+ */
+export function sendScout(scene: Scene): void {
+  const scout = [...scene.walkers]
+    .reverse()
+    .find((w, i, all) => i < all.length - 1 && (w.phase === 'idle' || w.phase === 'inside') && w.helping === undefined)
+  if (!scout) return
+  if (scout.phase === 'inside') leaveHome(scene, scout)
+  const side = scene.rand() < 0.5 ? -1 : 1
+  scout.phase = 'scouting'
+  scout.targetX = campX(scene) + side * SCOUT_RANGE
+  scout.awayUntil = scene.tick + SCOUT_TIMEOUT
+}
+
+/** A subagent is done: a scout comes back, with a sack of what it found when the errand went well. */
+export function scoutReturns(scene: Scene, hasLoot: boolean): void {
+  const scout = scene.walkers.find(w => w.phase === 'away') ?? scene.walkers.find(w => w.phase === 'scouting')
+  if (!scout) return
+  scout.phase = 'returning'
+  scout.awayUntil = undefined
+  scout.carry = hasLoot ? 'sack' : undefined
+  scout.targetX = hasLoot ? dropX(scene) : restSpot(scene)
+}
+
+/** Whether a scout is out on an errand. */
+export function hasScoutOut(scene: Scene): boolean {
+  return scene.walkers.some(w => w.phase === 'scouting' || w.phase === 'away')
+}
+
+/** Long quiet sends the village dozing; the next work wakes it with a crow. */
+export function setDozing(scene: Scene, isDozing: boolean): void {
+  if (scene.isDozing && !isDozing) scene.wokeAt = scene.tick
+  scene.isDozing = isDozing
+}
+
+function stepBugs(scene: Scene): void {
+  const home = campX(scene)
+  for (const bug of scene.bugs) {
+    if (bug.isCaught) {
+      // Pinned where it was spotted, so the catcher finds it.
+      continue
+    }
+    // A slow, aimless crawl, turning now and then and never far from the camp.
+    if (scene.rand() < 0.02 || Math.abs(bug.x + bug.dir - home) > 70) bug.dir = bug.dir > 0 ? -1 : 1
+    if (scene.tick % 3 === 0) bug.x += bug.dir
+  }
+}
+
 function stepChips(scene: Scene): void {
   for (const chip of scene.chips) {
     chip.x += chip.vx
@@ -450,6 +561,8 @@ export function stepScene(scene: Scene, isNight: boolean): void {
   scene.tick++
   const tick = scene.tick
   stepChips(scene)
+  stepBugs(scene)
+  const isWaking = scene.wokeAt !== undefined && tick - scene.wokeAt < WAKE_TICKS
 
   for (const walker of scene.walkers) {
     if (scene.queue.length === 0) break
@@ -534,6 +647,16 @@ export function stepScene(scene: Scene, isNight: boolean): void {
         // Out again in the morning, or after a short visit by day.
         if (!isNight && tick >= walker.restUntil) leaveHome(scene, walker)
         break
+      case 'scouting':
+        if (walk(walker, tick)) walker.phase = 'away'
+        break
+      case 'away':
+        if (walker.awayUntil !== undefined && tick >= walker.awayUntil) {
+          walker.phase = 'returning'
+          walker.awayUntil = undefined
+          walker.targetX = restSpot(scene)
+        }
+        break
       case 'returning':
         if (walk(walker, tick)) {
           walker.carry = undefined
@@ -545,6 +668,17 @@ export function stepScene(scene: Scene, isNight: boolean): void {
       case 'idle': {
         if (walker.x !== walker.targetX) {
           if (walk(walker, tick)) walker.pose = isNight ? 'sit' : 'stand'
+          break
+        }
+        if (isWaking) {
+          // Up with a start at the rooster's crow.
+          walker.pose = 'stand'
+          walker.hop = Math.floor((tick - scene.wokeAt!) / 3) % 2 === 0 ? -2 : 0
+          break
+        }
+        if (scene.isDozing) {
+          // Nothing to do for a long while: a doze where they rest.
+          walker.pose = 'sit'
           break
         }
         if (tick < walker.restUntil) break
@@ -578,6 +712,8 @@ export function isBusy(scene: Scene): boolean {
   return (
     scene.queue.length > 0 ||
     scene.chips.length > 0 ||
-    scene.walkers.some(w => (w.phase !== 'idle' && w.phase !== 'inside') || w.x !== w.targetX)
+    scene.bugs.length > 0 ||
+    (scene.wokeAt !== undefined && scene.tick - scene.wokeAt < WAKE_TICKS) ||
+    scene.walkers.some(w => (w.phase !== 'idle' && w.phase !== 'inside' && w.phase !== 'away') || w.x !== w.targetX)
   )
 }

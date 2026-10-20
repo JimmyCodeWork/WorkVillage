@@ -2,6 +2,7 @@
 
 import { P, ROOF_COLORS, SEASON_DRIFT, SEASON_LEAVES, seasonSky, skyFor, type Sky } from '../art/palette'
 import {
+  ROOSTER,
   CAUGHT_BOOT,
   CAUGHT_CHEST,
   CAUGHT_FISH,
@@ -38,7 +39,7 @@ import { BUILDINGS } from '../core/balance'
 import { hash01, seasonOf, wildPlot, type Look, type Plot, type Season, type Village } from '../core/world'
 import { invertMonochrome, isMono, toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
 import { CLEAR, createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
-import { FALL_TICKS, isWorked, occupied, plotCenter, PLOT, type Catch, type Chip, type Effect, type Scene, type Walker } from './sim'
+import { FALL_TICKS, isWorked, occupied, plotCenter, PLOT, WAKE_TICKS, type Catch, type Chip, type Effect, type Scene, type Walker } from './sim'
 
 /** Scene heights in pixels; a terminal row holds two. */
 export const SCENE_HEIGHTS = { small: 14, medium: 20 } as const
@@ -315,6 +316,48 @@ function drawFishing(canvas: Canvas, w: Walker, camera: number, tick: number): v
   }
 }
 
+const BUG_SHELL = 0x4a3b6b
+const BUG_SHINE = 0x8a7bb8
+
+/** The bugs a failed test run let loose: small beetles scuttling over the grass. */
+function drawBugs(canvas: Canvas, scene: Scene, camera: number): void {
+  const GROUND = groundOf(canvas)
+  for (const bug of scene.bugs) {
+    const x = Math.round(bug.x - camera)
+    const step = !bug.isCaught && Math.floor(scene.tick / 2) % 2 === 0
+    setPixel(canvas, x, GROUND - 1, BUG_SHELL)
+    setPixel(canvas, x + 1, GROUND - 1, BUG_SHELL)
+    setPixel(canvas, x + (bug.dir > 0 ? 1 : 0), GROUND - 2, BUG_SHINE)
+    setPixel(canvas, x + (step ? -1 : 2), GROUND, P.outline)
+    setPixel(canvas, x + (bug.dir > 0 ? 2 : -1), GROUND - 1, P.outline)
+  }
+}
+
+/** A Z drifting up from a dozing villager's head, one after another. */
+function drawSnore(canvas: Canvas, w: Walker, camera: number, tick: number): void {
+  const GROUND = groundOf(canvas)
+  const rise = (Math.floor(tick / 6) + w.id * 3) % 6
+  const x = Math.round(w.x - camera) + (w.facingLeft ? 1 : 5) + Math.floor(rise / 3)
+  const y = GROUND + 2 - VILLAGER_HEIGHT - 1 - rise
+  // A Z needs four pixels a side for its diagonal to read as one.
+  for (const [dx, dy] of [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3], [3, 3]] as const) {
+    setPixel(canvas, x + dx, y + dy - 3, P.white)
+  }
+}
+
+/** The rooster by the fire, crowing the village awake. */
+function drawRooster(canvas: Canvas, x: number, tick: number, wokeAt: number): void {
+  const GROUND = groundOf(canvas)
+  const y = GROUND + 1 - ROOSTER.height
+  drawSprite(canvas, ROOSTER, x, y)
+  // The crow, in short strokes from the beak.
+  if (Math.floor((tick - wokeAt) / 4) % 2 === 0) {
+    setPixel(canvas, x + 6, y, P.white)
+    setPixel(canvas, x + 7, y - 1, P.white)
+    setPixel(canvas, x + 6, y + 2, P.white)
+  }
+}
+
 /** Snow on whatever is uppermost in each column of a sprite. */
 function drawSnowCap(canvas: Canvas, art: Sprite, x: number, y: number, flip: boolean): void {
   for (let sx = 0; sx < art.width; sx++) {
@@ -519,11 +562,14 @@ export function renderFrame(
   drawStockpile(canvas, village, fireX + 4)
 
   const sorted = [...scene.walkers].sort((a, b) => a.id - b.id)
+  drawBugs(canvas, scene, camera)
   for (const w of sorted) {
-    if (w.phase === 'inside') continue
+    if (w.phase === 'inside' || w.phase === 'away') continue
     drawVillager(canvas, w.x - camera, GROUND + 2 - VILLAGER_HEIGHT + w.hop, w.pose, w.tunic, w.facingLeft)
     drawFishing(canvas, w, camera, tick)
+    if (scene.isDozing && w.phase === 'idle' && w.x === w.targetX) drawSnore(canvas, w, camera, tick)
   }
+  if (scene.wokeAt !== undefined && tick - scene.wokeAt < WAKE_TICKS) drawRooster(canvas, fireX + 8, tick, scene.wokeAt)
   drawChips(canvas, scene, camera)
   drawDrift(canvas, season, tick, village.seed, camera)
 

@@ -4,7 +4,7 @@ import { applySignal, createVillage } from '../src/core/world'
 import { toBase64, toRasterCells, toSvg } from '../src/pixel/encode'
 import { MONO_INK, MONO_PAPER } from '../src/pixel/filter'
 import { renderFrame, SCENE_HEIGHTS } from '../src/scene/render'
-import { createScene, enqueue, stepScene, syncScene } from '../src/scene/sim'
+import { catchBugs, createScene, enqueue, MAX_BUGS, releaseBug, scoutReturns, sendScout, setDozing, stepScene, syncScene } from '../src/scene/sim'
 
 describe('render', () => {
   test('base64 matches the standard alphabet and padding', () => {
@@ -269,5 +269,79 @@ describe('fishing', () => {
     syncScene(scene, v)
     stepScene(scene, false)
     expect(scene.walkers[0]!.action?.kind).toBe(work.action!.kind)
+  })
+})
+
+describe('events', () => {
+  const village = (villagers: number) => ({ ...createVillage(8, 0), villagers })
+  const run = (scene: ReturnType<typeof createScene>, ticks: number) => {
+    for (let i = 0; i < ticks; i++) stepScene(scene, false)
+  }
+
+  test('failed test runs let bugs loose, never more than a few', () => {
+    const scene = createScene(village(2))
+    for (let i = 0; i < 5; i++) releaseBug(scene)
+    expect(scene.bugs.length).toBe(MAX_BUGS)
+    run(scene, 300)
+    // They crawl about near the camp, waiting to be caught.
+    for (const bug of scene.bugs) expect(Math.abs(bug.x - (scene.camp * 12 + 6))).toBeLessThanOrEqual(72)
+  })
+
+  test('passing tests again: every bug is caught', () => {
+    const scene = createScene(village(2))
+    releaseBug(scene)
+    releaseBug(scene)
+    run(scene, 20)
+    expect(catchBugs(scene)).toBe(2)
+    expect(catchBugs(scene)).toBe(0)
+    let pounced = false
+    for (let i = 0; i < 400 && scene.bugs.length > 0; i++) {
+      stepScene(scene, false)
+      pounced ||= scene.walkers.some(w => w.phase === 'working' && w.action?.kind === 'catch' && w.pose === 'kneel')
+    }
+    expect(pounced).toBe(true)
+    expect(scene.bugs.length).toBe(0)
+  })
+
+  test('a scout goes out of sight on an errand and comes back with a sack', () => {
+    const scene = createScene(village(3))
+    run(scene, 10)
+    sendScout(scene)
+    // The one who keeps the camp never goes.
+    expect(scene.walkers[0]!.phase).not.toBe('scouting')
+    const scout = scene.walkers.find(w => w.phase === 'scouting')!
+    run(scene, 300)
+    expect(scout.phase).toBe('away')
+    scoutReturns(scene, true)
+    expect(scout.carry).toBe('sack')
+    run(scene, 400)
+    expect(scout.phase).toBe('idle')
+    expect(scout.carry).toBeUndefined()
+  })
+
+  test('an errand that fails brings the scout back empty-handed; a lone villager stays put', () => {
+    const scene = createScene(village(2))
+    sendScout(scene)
+    const scout = scene.walkers.find(w => w.phase === 'scouting')!
+    scoutReturns(scene, false)
+    expect(scout.phase).toBe('returning')
+    expect(scout.carry).toBeUndefined()
+    const alone = createScene(village(1))
+    sendScout(alone)
+    expect(alone.walkers[0]!.phase).not.toBe('scouting')
+  })
+
+  test('a long quiet sets the village dozing; work wakes it with a start', () => {
+    const scene = createScene(village(3))
+    run(scene, 200)
+    setDozing(scene, true)
+    run(scene, 200)
+    const resting = scene.walkers.filter(w => w.phase === 'idle' && w.x === w.targetX)
+    expect(resting.length).toBeGreaterThan(0)
+    expect(resting.every(w => w.pose === 'sit')).toBe(true)
+    setDozing(scene, false)
+    expect(scene.wokeAt).toBe(scene.tick)
+    run(scene, 1)
+    expect(scene.walkers.some(w => w.hop !== 0)).toBe(true)
   })
 })

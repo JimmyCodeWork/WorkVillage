@@ -54,6 +54,11 @@ export const REWARDS = {
   actionsPerArrival: 25,
   /** Food a villager brings back from the pond. */
   fishFood: 1,
+  /** Knowledge for each bug caught once the tests pass again. */
+  bugKnowledge: 2,
+  /** What a scout brings back from a subagent's errand. */
+  scoutWood: 2,
+  scoutStone: 1,
 } as const
 
 export const WORLD = {

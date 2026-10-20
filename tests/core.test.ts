@@ -222,3 +222,16 @@ describe('ponds and fishing', () => {
     expect(restore(JSON.parse(JSON.stringify(v)))?.plots[2]).toEqual({ kind: 'pond' })
   })
 })
+
+describe('event rewards', () => {
+  test('a bug caught brings knowledge, a scout timber and stone; neither moves the seasons', () => {
+    const v = createVillage(1, 0)
+    const bug = applySignal(v, 'bug').village
+    expect(bug.resources.knowledge).toBe(v.resources.knowledge + 2)
+    const scout = applySignal(v, 'scout').village
+    expect(scout.resources.wood).toBe(v.resources.wood + 2)
+    expect(scout.resources.stone).toBe(v.resources.stone + 1)
+    expect(bug.stats.actions).toBe(v.stats.actions)
+    expect(scout.stats.actions).toBe(v.stats.actions)
+  })
+})

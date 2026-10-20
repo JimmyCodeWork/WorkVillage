@@ -56,6 +56,11 @@ quiet moments a villager goes fishing: the float bobs, something bites, and the 
 the catch, most often a fish, now and then something else. Work never waits on fishing; the line
 comes in when there is a job to do.
 
+Now and then something else happens in the village. A bug may crawl out of the forest and scuttle
+about until the villagers catch it. A villager may set out on an errand, walk out of sight and come
+back later with a sack of finds. After a long quiet the villagers doze off where they sit, until a
+rooster by the fire crows them awake.
+
 The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
 and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves
 in autumn, and snow on the roofs and smoke from the chimneys in winter. The season is shown in the
