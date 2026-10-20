@@ -215,6 +215,7 @@ function progressLine(): string {
     return t('summary.building', { building: t(`building.${site.building}`), percent })
   }
   const next = nextBuilding(village)
+  if (next === undefined) return t('summary.complete')
   const cost = BUILDINGS[next].cost
   return t('summary.next', { building: t(`building.${next}`), wood: cost.wood, stone: cost.stone })
 }

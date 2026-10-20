@@ -5,12 +5,13 @@ import {
   ACCENT_SHARE,
   BASE_PROPS,
   BASE_ROOFS,
-  BUILD_ORDER,
+  BUILD_RULES,
   BUILDINGS,
   CAPACITY,
   FOUNTAIN_AFTER_BUILT,
   LAMP,
   PROPS,
+  REBUILDS,
   REWARDS,
   ROOFS,
   SEASON_ACTIONS,
@@ -37,7 +38,14 @@ export type Plot =
   | { kind: 'camp' }
   | { kind: 'pond' }
   | { kind: 'farm'; growth: number }
-  | { kind: 'building'; building: BuildingKind; progress: number; look?: Look }
+  | {
+      kind: 'building'
+      building: BuildingKind
+      progress: number
+      look?: Look
+      /** What stood here before, while it is being built again as something better. */
+      from?: BuildingKind
+    }
 
 export type Resources = { wood: number; stone: number; food: number; knowledge: number }
 
@@ -62,7 +70,7 @@ export type Village = {
   villagers: number
   resources: Resources
   stats: Stats
-  /** Index into BUILD_ORDER of the next building to place. */
+  /** How many buildings have been placed; it picks the next one, so a village always grows the same way. */
   nextBuild: number
   createdAt: number
   kit: Kit
@@ -200,8 +208,9 @@ export function stageOf(village: Village): Stage {
   return 'camp'
 }
 
+/** Finished buildings, counting one being built again as what it was: a village never shrinks while it rebuilds. */
 export function builtCount(village: Village): number {
-  return village.plots.filter(p => p.kind === 'building' && isComplete(p)).length
+  return village.plots.filter(p => p.kind === 'building' && (isComplete(p) || p.from !== undefined)).length
 }
 
 export function isComplete(plot: Plot): boolean {
@@ -211,7 +220,9 @@ export function isComplete(plot: Plot): boolean {
 export function capacity(village: Village): number {
   let total = CAPACITY.camp
   for (const plot of village.plots) {
+    // Those living in a building being rebuilt keep their home meanwhile.
     if (plot.kind === 'building' && isComplete(plot)) total += BUILDINGS[plot.building].housing
+    else if (plot.kind === 'building' && plot.from !== undefined) total += BUILDINGS[plot.from].housing
   }
   return Math.min(total, CAPACITY.most)
 }
@@ -238,14 +249,53 @@ function hasFountain(village: Village): boolean {
   return village.plots.some(p => p.kind === 'building' && p.building === 'fountain')
 }
 
+/** What the village builds next: a kind, and the plot of an old building it replaces if it is a rebuild. */
+export type Plan = { kind: BuildingKind; replace?: number }
+
+function countOf(village: Village, kind: BuildingKind): number {
+  return village.plots.filter(p => p.kind === 'building' && p.building === kind).length
+}
+
+function mostOf(most: readonly (readonly [number, number])[], built: number): number {
+  return most.reduce((cap, [at, count]) => (built >= at ? count : cap), 0)
+}
+
 /**
- * The next building: the fixed order, except that once the village has
- * enough buildings and no fountain, the fountain comes first. There is only
- * ever one.
+ * The next building, picked at random among the kinds the village may build
+ * now, each within its cap, and the rebuilds now due. The same village picks
+ * the same way every time. Once a village has enough buildings and no
+ * fountain, the fountain comes first; there is only ever one.
  */
-export function nextBuilding(village: Village): BuildingKind {
-  if (!hasFountain(village) && builtCount(village) >= FOUNTAIN_AFTER_BUILT) return 'fountain'
-  return BUILD_ORDER[Math.min(village.nextBuild, BUILD_ORDER.length - 1)]!
+export function planBuild(village: Village): Plan | undefined {
+  const built = builtCount(village)
+  if (!hasFountain(village) && built >= FOUNTAIN_AFTER_BUILT) return { kind: 'fountain' }
+  // Homes go up only while there is room for more villagers to come.
+  const needsHomes = capacity(village) < CAPACITY.most
+  const options: { plan: Plan; weight: number }[] = []
+  for (const [kind, rule] of Object.entries(BUILD_RULES) as [Exclude<BuildingKind, 'fountain'>, (typeof BUILD_RULES)[keyof typeof BUILD_RULES]][]) {
+    if (built < rule.from || (rule.until !== undefined && built >= rule.until)) continue
+    if (countOf(village, kind) >= mostOf(rule.most, built)) continue
+    if (BUILDINGS[kind].housing > 0 && !needsHomes) continue
+    options.push({ plan: { kind }, weight: rule.weight })
+  }
+  for (const rebuild of REBUILDS) {
+    if (built < rebuild.after) continue
+    const old = byDistance(village, p => p.kind === 'building' && p.building === rebuild.from && isComplete(p))[0]
+    if (old !== undefined) options.push({ plan: { kind: rebuild.to, replace: old }, weight: rebuild.weight })
+  }
+  // Everything the village wants is built: no new site until it wants more.
+  if (options.length === 0) return undefined
+  const total = options.reduce((sum, o) => sum + o.weight, 0)
+  let roll = hash01(village.seed + 101, village.nextBuild) * total
+  for (const option of options) {
+    roll -= option.weight
+    if (roll < 0) return option.plan
+  }
+  return options.at(-1)!.plan
+}
+
+export function nextBuilding(village: Village): BuildingKind | undefined {
+  return planBuild(village)?.kind
 }
 
 function canAfford(village: Village, kind: BuildingKind): boolean {
@@ -338,16 +388,22 @@ function siteFor(village: Village, kind: BuildingKind): number | undefined {
 
 /** Places the next building on open ground if it can be paid for. */
 function placeSite(village: Village): { village: Village; plot?: number } {
-  const kind = nextBuilding(village)
-  if (!canAfford(village, kind)) return { village }
-  const ground = siteFor(village, kind)
-  if (ground === undefined) return { village }
+  const plan = planBuild(village)
+  if (plan === undefined || !canAfford(village, plan.kind)) return { village }
+  const { kind, replace } = plan
   const cost = BUILDINGS[kind].cost
   let next = gain(village, { wood: -cost.wood, stone: -cost.stone })
+  if (replace !== undefined) {
+    // Taken down and built again where it stood, keeping its look.
+    const old = village.plots[replace]
+    if (old?.kind !== 'building') return { village }
+    next = withPlot(next, replace, { kind: 'building', building: kind, progress: 0, look: old.look, from: old.building })
+    return { village: { ...next, nextBuild: next.nextBuild + 1 }, plot: replace }
+  }
+  const ground = siteFor(village, kind)
+  if (ground === undefined) return { village }
   next = withPlot(next, ground, { kind: 'building', building: kind, progress: 0, look: chooseLook(village) })
-  // The fountain stands outside the order, which carries on where it was.
-  if (kind !== 'fountain') next = { ...next, nextBuild: next.nextBuild + 1 }
-  return { village: next, plot: ground }
+  return { village: { ...next, nextBuild: next.nextBuild + 1 }, plot: ground }
 }
 
 function build(village: Village, index: number, steps: number, milestones: Milestone[]): Village {
@@ -358,6 +414,8 @@ function build(village: Village, index: number, steps: number, milestones: Miles
   const progress = Math.min(total, plot.progress + steps)
   let next = withPlot(village, index, { ...plot, progress })
   if (progress >= total && plot.progress < total) {
+    // A rebuild done: nothing of the old building is left.
+    if (plot.from !== undefined) next = withPlot(next, index, { kind: 'building', building: plot.building, progress, look: plot.look })
     milestones.push({ kind: 'built', building: plot.building })
     const stage = stageOf(next)
     if (stage !== stageBefore) milestones.push({ kind: 'stage', stage })
@@ -466,7 +524,8 @@ export function pondNear(village: Village): number | undefined {
 }
 
 function neededStone(village: Village): number {
-  return BUILDINGS[nextBuilding(village)].cost.stone
+  const next = nextBuilding(village)
+  return next === undefined ? 0 : BUILDINGS[next].cost.stone
 }
 
 function forageAction(village: Village): Action {
@@ -655,9 +714,14 @@ function restorePlot(value: unknown): Plot | undefined {
       if (typeof p.building !== 'string' || !Object.hasOwn(BUILDINGS, p.building)) return undefined
       const building = p.building as BuildingKind
       if (!isCount(p.progress, BUILDINGS[building].steps)) return undefined
-      if (p.look === undefined) return { kind: 'building', building, progress: p.progress }
-      const look = restoreLook(p.look)
-      return look && { kind: 'building', building, progress: p.progress, look }
+      let from: BuildingKind | undefined
+      if (p.from !== undefined) {
+        if (typeof p.from !== 'string' || !Object.hasOwn(BUILDINGS, p.from)) return undefined
+        from = p.from as BuildingKind
+      }
+      const look = p.look === undefined ? undefined : restoreLook(p.look)
+      if (p.look !== undefined && look === undefined) return undefined
+      return { kind: 'building', building, progress: p.progress, ...(look && { look }), ...(from && { from }) }
     }
     default:
       return undefined

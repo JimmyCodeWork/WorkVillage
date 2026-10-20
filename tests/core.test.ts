@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { BUILDINGS, SEASON_ACTIONS } from '../src/core/balance'
-import { applySignal, createVillage, isComplete, lampSpots, nextBuilding, pondNear, restore, seasonOf, squareOf, stageOf, wildPlot, withStyles, type Signal, type Village } from '../src/core/world'
+import { applySignal, capacity, createVillage, isComplete, lampSpots, nextBuilding, pondNear, restore, seasonOf, squareOf, stageOf, wildPlot, withStyles, type Signal, type Village } from '../src/core/world'
 
 function run(village: Village, signals: readonly Signal[]): Village {
   return signals.reduce((v, s) => applySignal(v, s).village, village)
@@ -334,5 +334,72 @@ describe('population', () => {
   test('however many homes there are, no more than twenty live in the village', () => {
     const v = run(createVillage(21, 0), Array.from({ length: 1500 }, (_, i) => (['edit', 'edit', 'commit', 'task', 'create', 'test'] as const)[i % 6]!))
     expect(v.villagers).toBe(20)
+  })
+})
+
+describe('what gets built', () => {
+  const signals = ['edit', 'edit', 'commit', 'task', 'create', 'test'] as const
+  const history = (seed: number, count: number) => {
+    let v = createVillage(seed, 0)
+    const order: string[] = []
+    for (let i = 0; i < count; i++) {
+      const outcome = applySignal(v, signals[i % signals.length]!)
+      for (const m of outcome.milestones) if (m.kind === 'built') order.push(m.building)
+      v = outcome.village
+    }
+    return { v, order }
+  }
+  const counts = (v: Village) => {
+    const c: Record<string, number> = {}
+    for (const p of v.plots) if (p.kind === 'building') c[p.building] = (c[p.building] ?? 0) + 1
+    return c
+  }
+
+  test('every village starts with a tent, then builds in an order of its own', () => {
+    const orders = [1, 2, 3, 21, 40].map(seed => history(seed, 600).order)
+    for (const order of orders) expect(order[0]).toBe('tent')
+    expect(new Set(orders.map(o => o.slice(0, 8).join())).size).toBeGreaterThan(1)
+    // The same seed always grows the same way.
+    expect(history(21, 600).order).toEqual(history(21, 600).order)
+  })
+
+  test('each kind keeps to its cap, and homes stop once there is room for everyone', () => {
+    for (const seed of [1, 2, 3, 21, 40]) {
+      const { v } = history(seed, 1500)
+      const c = counts(v)
+      expect(c.tent ?? 0).toBeLessThanOrEqual(1)
+      expect(c.hut ?? 0).toBeLessThanOrEqual(3)
+      for (const kind of ['well', 'storehouse', 'workshop', 'tower']) expect(c[kind] ?? 0).toBeLessThanOrEqual(2)
+      expect(c.fountain).toBe(1)
+      expect(capacity(v)).toBeLessThanOrEqual(20)
+      // Not a house more than the village needs to reach twenty.
+      expect((c.house ?? 0) * 2).toBeLessThanOrEqual(20 + 2)
+    }
+  })
+
+  test('once everything is built, no new site is started', () => {
+    const { v } = history(21, 3000)
+    expect(nextBuilding(v)).toBeUndefined()
+    expect(v.plots.some(p => p.kind === 'building' && !isComplete(p))).toBe(false)
+  })
+
+  test('old buildings are rebuilt as better ones, with no one losing their home or the village its stage', () => {
+    const { v } = history(21, 1500)
+    expect(counts(v).tent ?? 0).toBe(0)
+    let mid = createVillage(21, 0)
+    let saw = false
+    for (let i = 0; i < 1500 && !saw; i++) {
+      const before = { stage: stageOf(mid), capacity: capacity(mid) }
+      const outcome = applySignal(mid, signals[i % signals.length]!)
+      const rebuilding = outcome.village.plots.some(p => p.kind === 'building' && p.from !== undefined)
+      if (rebuilding && !mid.plots.some(p => p.kind === 'building' && p.from !== undefined)) {
+        saw = true
+        expect(stageOf(outcome.village)).toBe(before.stage)
+        expect(capacity(outcome.village)).toBeGreaterThanOrEqual(before.capacity)
+        expect(outcome.milestones.some(m => m.kind === 'stage')).toBe(false)
+      }
+      mid = outcome.village
+    }
+    expect(saw).toBe(true)
   })
 })

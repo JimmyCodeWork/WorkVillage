@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Buildings are no longer raised in one fixed order. After its first tent, each village picks its
+  next building at random among the kinds it may build now: huts early on, then wells, storehouses,
+  houses, workshops and watchtowers as the village grows, each kept to a sensible number for a
+  village of that size. Homes go up only while there is room for more villagers, and once
+  everything a village wants is built it starts no new site. The same village always grows the same
+  way.
+- As the village grows, its tent is taken down and rebuilt as a hut, and later its huts as houses.
+  Those living there keep their home while it is rebuilt, and the village keeps its stage.
 - Buildings go where they suit: the plot beside the fire is kept free as the village square until
   the fountain stands there, in the middle of the village; the watchtower goes up on the outer edge
   facing the forest; new fields are broken on the outskirts; the rest are built near the fire as
