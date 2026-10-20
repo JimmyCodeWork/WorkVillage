@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 - 2026-10-20
 
 - Events: now and then something happens in the village on its own.
   - A bug may crawl out of the forest and scuttle about until the villagers catch it, which brings a
