@@ -4,7 +4,7 @@ import { applySignal, createVillage } from '../src/core/world'
 import { toBase64, toRasterCells, toSvg } from '../src/pixel/encode'
 import { MONO_INK, MONO_PAPER } from '../src/pixel/filter'
 import { renderFrame, SCENE_HEIGHTS } from '../src/scene/render'
-import { catchBugs, createScene, CROW_TICKS, enqueue, MAX_BUGS, releaseBug, scoutReturns, sendScout, setDozing, stepScene, syncScene } from '../src/scene/sim'
+import { catchBugs, createScene, CROW_TICKS, enqueue, isDozing, lampsOf, MAX_BUGS, releaseBug, scoutReturns, sendScout, setDrowsiness, stepScene, syncScene, wake } from '../src/scene/sim'
 
 describe('render', () => {
   test('base64 matches the standard alphabet and padding', () => {
@@ -210,10 +210,11 @@ describe('homes', () => {
     const scene = createScene(v)
     for (let i = 0; i < 400; i++) stepScene(scene, true)
     expect(scene.walkers[0]!.phase).not.toBe('inside')
-    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
-    // In the morning they come out again.
-    for (let i = 0; i < 40; i++) stepScene(scene, false)
-    expect(scene.walkers.filter(w => w.phase === 'inside').length).toBeLessThan(scene.walkers.length / 2)
+    // Most are in bed; one may be up for a walk in the night.
+    expect(scene.walkers.slice(1).filter(w => w.phase === 'inside').length).toBeGreaterThan((scene.walkers.length - 1) / 2)
+    // In the morning they come out again, each in their own time.
+    for (let i = 0; i < 700; i++) stepScene(scene, false)
+    expect(scene.walkers.filter(w => w.phase === 'inside').length).toBeLessThanOrEqual(scene.walkers.length / 2)
   })
 
   test('work at night brings a villager out of the house', () => {
@@ -331,50 +332,81 @@ describe('events', () => {
     expect(alone.walkers[0]!.phase).not.toBe('scouting')
   })
 
-  test('in a long quiet those with a home go in to nap, and come out when work wakes the village', () => {
+  const settled = () => {
     let v = createVillage(21, 0)
     const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
-    for (let i = 0; i < 150; i++) v = applySignal(v, signals[i % signals.length]!).village
-    const scene = createScene(v)
-    run(scene, 100)
-    setDozing(scene, true)
-    run(scene, 400)
-    // The one who keeps the camp dozes by the fire; everyone else is home asleep.
-    expect(scene.walkers[0]!.phase).toBe('idle')
-    expect(scene.walkers[0]!.pose).toBe('sit')
-    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
-    // A nap is not a short visit: it lasts as long as the quiet does.
-    run(scene, 400)
-    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
-    setDozing(scene, false)
-    run(scene, 2)
-    expect(scene.walkers.filter(w => w.phase === 'inside').length).toBe(0)
+    for (let i = 0; i < 90; i++) v = applySignal(v, signals[i % signals.length]!).village
+    return v
+  }
+
+  test('dozing comes now and then, one villager at a time, never the whole village', () => {
+    const scene = createScene(settled())
+    setDrowsiness(scene, 1)
+    let most = 0
+    let dozed = 0
+    let napped = false
+    for (let i = 0; i < 2000; i++) {
+      stepScene(scene, false)
+      const dozing = scene.walkers.filter(w => isDozing(w, scene.tick))
+      most = Math.max(most, dozing.length)
+      dozed = Math.max(dozed, dozing.length)
+      napped ||= scene.walkers.some(w => w.isNapping && w.phase === 'inside')
+    }
+    expect(dozed).toBeGreaterThan(0)
+    expect(napped).toBe(true)
+    expect(most).toBeLessThanOrEqual(Math.floor(scene.walkers.length / 2))
   })
 
-  test('woken after dark, the nappers sleep on', () => {
-    let v = createVillage(21, 0)
-    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
-    for (let i = 0; i < 150; i++) v = applySignal(v, signals[i % signals.length]!).village
-    const scene = createScene(v)
-    setDozing(scene, true)
-    for (let i = 0; i < 400; i++) stepScene(scene, true)
-    setDozing(scene, false)
-    for (let i = 0; i < 20; i++) stepScene(scene, true)
-    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
+  test('the drowsier the village, the oftener a doze', () => {
+    const count = (drowsiness: number) => {
+      const scene = createScene(settled())
+      setDrowsiness(scene, drowsiness)
+      let total = 0
+      for (let i = 0; i < 2000; i++) {
+        stepScene(scene, false)
+        total += scene.walkers.filter(w => isDozing(w, scene.tick)).length
+      }
+      return total
+    }
+    expect(count(1)).toBeGreaterThan(count(0))
   })
 
-  test('a long quiet sets the village dozing; work wakes it with a start', () => {
-    const scene = createScene(village(3))
-    run(scene, 200)
-    setDozing(scene, true)
-    run(scene, 200)
-    const resting = scene.walkers.filter(w => w.phase === 'idle' && w.x === w.targetX)
-    expect(resting.length).toBeGreaterThan(0)
-    expect(resting.every(w => w.pose === 'sit')).toBe(true)
-    setDozing(scene, false)
-    expect(scene.wokeAt).toBe(scene.tick)
-    run(scene, 1)
-    expect(scene.walkers.some(w => w.hop !== 0)).toBe(true)
+  test('work wakes the dozers with a start and fetches the nappers out by day', () => {
+    const scene = createScene(settled())
+    setDrowsiness(scene, 1)
+    for (let i = 0; i < 2000 && !scene.walkers.some(w => w.phase === 'idle' && isDozing(w, scene.tick) && w.x === w.targetX); i++) stepScene(scene, false)
+    const dozer = scene.walkers.find(w => w.phase === 'idle' && isDozing(w, scene.tick))!
+    expect(dozer).toBeDefined()
+    wake(scene)
+    expect(scene.drowsiness).toBe(0)
+    expect(scene.walkers.some(w => isDozing(w, scene.tick))).toBe(false)
+    stepScene(scene, false)
+    expect(dozer.hop).not.toBe(0)
+    stepScene(scene, false)
+    expect(scene.walkers.some(w => w.isNapping)).toBe(false)
+  })
+
+  test('at night most are in bed, though now and then one gets up for a walk under the lamps', () => {
+    const scene = createScene(settled())
+    expect(scene.lamps.length).toBeGreaterThan(0)
+    let strolled = false
+    let inBed = 0
+    for (let i = 0; i < 3000; i++) {
+      stepScene(scene, true)
+      strolled ||= scene.walkers.some(w => w.strollUntil !== undefined && w.phase === 'idle')
+      if (i === 2999) inBed = scene.walkers.filter(w => w.phase === 'inside').length
+    }
+    expect(strolled).toBe(true)
+    expect(inBed).toBeGreaterThan((scene.walkers.length - 1) / 2)
+  })
+
+  test('woken by work at night, those in bed sleep on', () => {
+    const scene = createScene(settled())
+    for (let i = 0; i < 600; i++) stepScene(scene, true)
+    const inBed = scene.walkers.filter(w => w.phase === 'inside')
+    wake(scene)
+    stepScene(scene, true)
+    expect(inBed.every(w => w.phase === 'inside')).toBe(true)
   })
 })
 
@@ -387,7 +419,7 @@ describe('the rooster', () => {
     const scene = createScene(createVillage(8, 0))
     const camp = scene.camp * 12 + 6
     const poses = new Set<string>()
-    for (let i = 0; i < 600; i++) {
+    for (let i = 0; i < 2000; i++) {
       stepScene(scene, false)
       poses.add(scene.rooster.pose)
       expect(Math.abs(scene.rooster.x - camp)).toBeLessThanOrEqual(42)
@@ -396,23 +428,24 @@ describe('the rooster', () => {
     expect(poses.has('crow')).toBe(false)
   })
 
-  test('it sleeps by the fire at night and in a long quiet', () => {
+  test('it sleeps by the fire at night, and dozes in the sun now and then by day', () => {
     const night = createScene(createVillage(8, 0))
     step(night, 200, true)
     expect(night.rooster.pose).toBe('sit')
-    const quiet = createScene(createVillage(8, 0))
-    step(quiet, 20, false)
-    setDozing(quiet, true)
-    step(quiet, 200, false)
-    expect(quiet.rooster.pose).toBe('sit')
+    const day = createScene(createVillage(8, 0))
+    setDrowsiness(day, 1)
+    let dozed = false
+    for (let i = 0; i < 2000 && !dozed; i++) {
+      stepScene(day, false)
+      dozed = day.rooster.pose === 'sit'
+    }
+    expect(dozed).toBe(true)
   })
 
-  test('it crows when night turns to day, and not when the village wakes from a doze', () => {
+  test('it crows when night turns to day, and not when work wakes the village', () => {
     const scene = createScene(createVillage(8, 0))
     step(scene, 50, false)
-    setDozing(scene, true)
-    step(scene, 50, false)
-    setDozing(scene, false)
+    wake(scene)
     step(scene, 10, false)
     expect(scene.tick).toBeGreaterThan(scene.rooster.crowUntil)
     step(scene, 50, true)
@@ -420,6 +453,7 @@ describe('the rooster', () => {
     expect(scene.rooster.crowUntil).toBe(scene.tick + CROW_TICKS)
     expect(['crow', 'stand']).toContain(scene.rooster.pose)
   })
+
 })
 
 describe('meadows', () => {
@@ -445,5 +479,26 @@ describe('meadows', () => {
     const colors = meadow(3)
     expect(colors.has(PINK)).toBe(false)
     expect(colors.has(BLUE)).toBe(false)
+  })
+})
+
+describe('street lamps', () => {
+  test('lamps go up once the village is a hamlet, and light up after dark', () => {
+    expect(lampsOf(createVillage(21, 0))).toEqual([])
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 90; i++) v = applySignal(v, signals[i % signals.length]!).village
+    const lamps = lampsOf(v)
+    expect(lamps.length).toBeGreaterThan(0)
+    // Never squeezed between two buildings.
+    for (const x of lamps) {
+      const left = v.plots[x / 12 - 1]
+      const right = v.plots[x / 12]
+      expect(left?.kind === 'building' && right?.kind === 'building').toBe(false)
+    }
+    const scene = createScene(v)
+    scene.walkers = []
+    const night = renderFrame(v, scene, 400, { hour: 23 }, { height: 20 })
+    expect(new Set(night.pixels).has(0xf2d27a)).toBe(true)
   })
 })

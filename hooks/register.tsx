@@ -43,9 +43,10 @@ import {
   releaseBug,
   scoutReturns,
   sendScout,
-  setDozing,
+  setDrowsiness,
   stepScene,
   syncScene,
+  wake,
   type Scene,
 } from '../src/scene/sim'
 import { SETTINGS, settingValue, type SettingField } from '../src/settings'
@@ -62,8 +63,10 @@ const MAX_RASTER_COLUMNS = 512
 const MAX_IMAGE_COLUMNS = 255
 /** Widest vector scene, in scene pixels; past it the scene is centred. */
 const MAX_VECTOR_WIDTH = 640
-/** Quiet this long, and the villagers doze off where they rest. */
-const DOZE_MS = 3 * 60_000
+/** After this long without work the villagers grow drowsy, and dozes come oftener... */
+const DROWSY_AFTER_MS = 60_000
+/** ...until, this long after that, they are as drowsy as they get. */
+const DROWSY_OVER_MS = 4 * 60_000
 /** Roughly how many CSS pixels one column of a vector surface is. */
 const VECTOR_CELL_PX = 8
 
@@ -343,7 +346,7 @@ function adopt(village: Village): void {
 /** Something happened: the village wakes if it was dozing. */
 function stir(): void {
   rt.lastActivity = Date.now()
-  setDozing(rt.scene, false)
+  wake(rt.scene)
 }
 
 async function apply($: EngineInterface, signals: readonly Signal[]): Promise<void> {
@@ -389,7 +392,7 @@ function rasterCells(canvas: ReturnType<typeof frame>): string {
 
 function tick($: EngineInterface): void {
   const hour = localHour()
-  setDozing(rt.scene, Date.now() - rt.lastActivity > DOZE_MS)
+  setDrowsiness(rt.scene, (Date.now() - rt.lastActivity - DROWSY_AFTER_MS) / DROWSY_OVER_MS)
   stepScene(rt.scene, isNightHour(hour))
   let hasVector = false
   for (const [requestId, mount] of rt.mounts) {

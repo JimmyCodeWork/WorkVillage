@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Dozing is now an occasional thing each villager does on their own, rather than the whole village
+  falling asleep at once. A villager at rest may doze off where it sits or go home for a nap, more
+  often the longer things stay quiet, but never more than half the village at a time; each wakes on
+  their own after a while, and work wakes whoever is dozing with a start. The rooster dozes in the
+  sun now and then too.
+- Nights are ordinary sleep: villagers with a home go to bed, with a Z over the roof, rising in the
+  morning each in their own time. Now and then one gets up for a walk in the night before going back
+  to bed.
+- Street lamps go up along the village once it is a hamlet, on every third edge between settled
+  plots, and light up after dark with a pool of warm light. Night walks lead to them.
 - The README covers installing in the desktop app and keeping WorkVillage updated, including turning
   on auto-update, and notes that installing from a shell with `--marketplace` needs Claude Code
   2.1.292 or later.
