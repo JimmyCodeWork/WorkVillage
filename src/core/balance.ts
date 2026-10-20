@@ -52,6 +52,8 @@ export const REWARDS = {
   commitWood: 2,
   commitStone: 2,
   actionsPerArrival: 25,
+  /** Food a villager brings back from the pond. */
+  fishFood: 1,
 } as const
 
 export const WORLD = {
@@ -60,6 +62,12 @@ export const WORLD = {
   minWild: 4,
   expandBy: 2,
   maxPlots: 40,
+  /** Share of the wild that is water. */
+  pondShare: 0.05,
+  /** How far from the camp, in plots, a villager walks to fish. */
+  fishingReach: 12,
+  /** Buildings a village has before it digs a pond of its own, if it has none. */
+  pondAfterBuilt: 2,
 } as const
 
 /** Roof colourings a building can be raised with; `classic` is the art as drawn. */

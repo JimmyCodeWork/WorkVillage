@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { BUILDINGS, SEASON_ACTIONS } from '../src/core/balance'
-import { applySignal, createVillage, restore, seasonOf, stageOf, withStyles, type Signal, type Village } from '../src/core/world'
+import { applySignal, createVillage, isComplete, pondNear, restore, seasonOf, stageOf, wildPlot, withStyles, type Signal, type Village } from '../src/core/world'
 
 function run(village: Village, signals: readonly Signal[]): Village {
   return signals.reduce((v, s) => applySignal(v, s).village, village)
@@ -175,5 +175,50 @@ describe('seasons', () => {
   test('turns alone do not move the seasons', () => {
     const v = run(createVillage(1, 0), Array.from({ length: SEASON_ACTIONS * 2 }, () => 'turn' as const))
     expect(seasonOf(v)).toBe('spring')
+  })
+})
+
+describe('ponds and fishing', () => {
+  const withPond = (index: number) => {
+    const v = createVillage(5, 0)
+    const plots = v.plots.map((p, i) => (i === index ? ({ kind: 'pond' } as const) : p.kind === 'pond' ? ({ kind: 'grass' } as const) : p))
+    return { ...v, plots }
+  }
+
+  test('some of the wild is water', () => {
+    const plots = Array.from({ length: 400 }, (_, i) => wildPlot(3, i + 2))
+    const ponds = plots.filter(p => p.kind === 'pond').length
+    expect(ponds).toBeGreaterThan(5)
+    expect(ponds).toBeLessThan(40)
+  })
+
+  test('when Claude has answered, a villager goes fishing and brings back food', () => {
+    const v = withPond(2)
+    const outcome = applySignal(v, 'turn')
+    expect(outcome.action).toEqual({ kind: 'fish', plot: 2, before: undefined })
+    expect(outcome.village.resources.food).toBe(v.resources.food + 1)
+    // Waiting is not work: the seasons do not move for it.
+    expect(outcome.village.stats.actions).toBe(v.stats.actions)
+  })
+
+  test('a settled village with no water digs a pond where it clears a stump', () => {
+    const grown = run(createVillage(7, 0), Array.from({ length: 200 }, (_, i) => (i % 6 === 5 ? 'commit' : 'edit') as Signal))
+    // Finished buildings, nothing to pay for a new one, the wild all stumps and no water anywhere in it.
+    const plots = grown.plots.map(p =>
+      p.kind === 'building' ? { ...p, progress: BUILDINGS[p.building].steps } : p.kind === 'tree' || p.kind === 'rock' || p.kind === 'pond' ? ({ kind: 'stump' } as const) : p,
+    )
+    // Stone to spare, so nobody hauls more of it, but no timber to start a building.
+    const dry = { ...grown, plots, resources: { wood: 0, stone: 999, food: 0, knowledge: 0 } }
+    expect(dry.plots.filter(p => p.kind === 'building').length).toBeGreaterThanOrEqual(2)
+    const outcome = applySignal(dry, 'edit')
+    expect(outcome.action?.kind).toBe('clear')
+    const after = outcome.village.plots[outcome.action!.plot]
+    // The wild beyond the village may have water of its own within reach; then there is no need to dig.
+    expect(after?.kind).toBe(pondNear(dry) === undefined ? 'pond' : 'grass')
+  })
+
+  test('ponds load back', () => {
+    const v = withPond(2)
+    expect(restore(JSON.parse(JSON.stringify(v)))?.plots[2]).toEqual({ kind: 'pond' })
   })
 })

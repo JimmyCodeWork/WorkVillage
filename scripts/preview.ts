@@ -87,7 +87,8 @@ const shots: [string, number, number, number][] = [
 ]
 for (const [name, signals, frames, hour] of shots) {
   run(signals, frames)
-  for (let f = 0; f < 12; f++) stepScene(scene, hour >= 20)
+  // At night give the villagers time to walk home and light their windows.
+  for (let f = 0; f < (hour >= 20 ? 900 : 12); f++) stepScene(scene, hour >= 20)
   const frame = renderFrame(village, scene, 160, { hour })
   writeFileSync(join(out, `${name}.png`), png(frame, 6))
   if (name === '04-village') {

@@ -295,5 +295,10 @@ export const BENCH = s(['WWWW', 'd..d'])
 /** A pennant in the roof's own colour. */
 export const BANNER = s(['drr', 'dr.', 'd..', 'd..'])
 
+/** What a villager holds up from the pond. */
+export const CAUGHT_FISH = s(['.QQq.', 'QQQQq', '.QQq.'])
+export const CAUGHT_BOOT = s(['dd.', 'dd.', 'ddd'])
+export const CAUGHT_CHEST = s(['wWWw', 'dzzd', 'dddd'])
+
 export const FLOWER = s(['z', 'e'])
 export const TUFT = s(['m.m', '.m.'])

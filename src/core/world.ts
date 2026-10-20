@@ -33,6 +33,7 @@ export type Plot =
   | { kind: 'stump' }
   | { kind: 'grass' }
   | { kind: 'camp' }
+  | { kind: 'pond' }
   | { kind: 'farm'; growth: number }
   | { kind: 'building'; building: BuildingKind; progress: number; look?: Look }
 
@@ -80,6 +81,7 @@ export type ActionKind =
   | 'celebrate'
   | 'study'
   | 'ponder'
+  | 'fish'
 
 /** What a villager should be seen doing for a signal. */
 export type Action = {
@@ -122,6 +124,7 @@ const TREE_KINDS = 3
 export function wildPlot(seed: number, index: number): Plot {
   const r = hash01(seed, index)
   if (r < 0.14) return { kind: 'rock', variant: Math.floor(hash01(seed + 7, index) * 2) }
+  if (r < 0.14 + WORLD.pondShare && index !== 0 && index !== 1) return { kind: 'pond' }
   // Each forest has a tree of its own that grows in about half its plots.
   const own = seed % TREE_KINDS
   const variant = hash01(seed + 17, index) < 0.5 ? own : Math.floor(hash01(seed + 13, index) * TREE_KINDS)
@@ -351,10 +354,27 @@ function labour(village: Village, preferStone: boolean, milestones: Milestone[])
   }
   if (stump !== undefined) {
     const before = v.plots[stump]
-    v = gain(withPlot(v, stump, { kind: 'grass' }), { wood: REWARDS.clearWood })
+    // A settled village with no water near digs a pond where the stump was.
+    const digs = builtCount(v) >= WORLD.pondAfterBuilt && pondNear(v) === undefined
+    v = gain(withPlot(v, stump, digs ? { kind: 'pond' } : { kind: 'grass' }), { wood: REWARDS.clearWood })
     return { village: v, action: { kind: 'clear', plot: stump, before }, milestones }
   }
   return { village: v, action: forageAction(v), milestones }
+}
+
+/**
+ * The nearest pond within reach of the camp, in the village or in the
+ * wilderness beyond it, where the plot index runs past the village's ends.
+ */
+export function pondNear(village: Village): number | undefined {
+  for (let d = 1; d <= WORLD.fishingReach; d++) {
+    for (const index of [village.camp - d, village.camp + d]) {
+      const inside = index >= 0 && index < village.plots.length
+      const plot = inside ? village.plots[index]! : wildPlot(village.seed, index - village.camp)
+      if (plot.kind === 'pond') return index
+    }
+  }
+  return undefined
 }
 
 function neededStone(village: Village): number {
@@ -464,9 +484,16 @@ export function applySignal(village: Village, signal: Signal): Outcome {
           : { village: gain(v, { food: 2 }), milestones }
       break
     }
-    case 'turn':
-      outcome = { village: count(village, 'turns'), milestones }
+    case 'turn': {
+      // Claude has answered and waits: a villager goes fishing until there is work again.
+      const v = count(village, 'turns')
+      const pond = pondNear(v)
+      outcome =
+        pond === undefined
+          ? { village: v, milestones }
+          : { village: gain(v, { food: REWARDS.fishFood }), action: { kind: 'fish', plot: pond, before: undefined }, milestones }
       break
+    }
   }
 
   let v = outcome.village
@@ -523,6 +550,7 @@ function restorePlot(value: unknown): Plot | undefined {
     case 'stump':
     case 'grass':
     case 'camp':
+    case 'pond':
       return { kind: p.kind }
     case 'farm':
       return isCount(p.growth, 100) ? { kind: 'farm', growth: p.growth } : undefined

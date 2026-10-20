@@ -44,6 +44,7 @@ Requires Claude Code 2.1.275 or later.
 | A test run passes | Plant, water and harvest fields for **food** |
 | A `git commit` succeeds | A milestone: a big push on the current building |
 | A to-do or task is completed | A new villager arrives, if there is a home for them |
+| Claude finishes answering and waits for you | Go fishing at the pond for **food** |
 
 Every 4 knowledge becomes a planned step on the building under way, so reading and thinking help
 the village grow too.
@@ -54,8 +55,15 @@ with the work under way, and once a storehouse stands, timber and stone are carr
 
 Buildings are raised in order: Tent, Hut, Well, Storehouse, House, Workshop and Watchtower.
 Each costs timber and stone and takes several steps of work to finish. When the trees near the
-camp are gone, the clearing extends further into the forest. The sky follows your local time,
-and at night the villagers gather around the fire.
+camp are gone, the clearing extends further into the forest. The sky follows your local time.
+Villagers with a home go in after dark, and its windows light up while someone is in; the one who
+keeps the camp stays by the fire. By day they now and then look in at home, and work that comes in
+at night brings someone out of the house.
+
+The wild has ponds in it, and a village with none near digs one once it has a few buildings. While
+Claude waits for you, a villager goes fishing: the float bobs, something bites, and the villager
+holds up the catch, most often a fish, now and then something else. Work never waits on fishing;
+the line comes in when there is a job to do.
 
 The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
 and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves

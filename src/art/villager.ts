@@ -23,6 +23,10 @@ export type Pose =
   | 'read'
   | 'ponder1'
   | 'ponder2'
+  | 'rodCast'
+  | 'rodOut'
+  | 'rodPull'
+  | 'holdUp'
 
 /** Width of the box the villager is drawn in; the body sits in its middle. */
 export const VILLAGER_WIDTH = 9
@@ -72,6 +76,18 @@ const ARMS: Record<Pose, readonly Px[]> = {
   // A hand at the chin, and a spark of an idea that comes and goes.
   ponder1: [[6, 5, P.skin], [6, 4, P.skinShade], [7, 0, P.fireCore], [8, -1, P.fireCore]],
   ponder2: [[6, 5, P.skin], [6, 4, P.skinShade], [7, 0, P.fireCore]],
+  // A fishing rod: drawn back over the shoulder, held out over the water, pulled up as a fish bites.
+  rodCast: [[5, 4, P.skin], [4, 3, P.woodDark], [3, 2, P.woodDark], [2, 1, P.woodDark], [1, 0, P.woodDark]],
+  rodOut: [[6, 5, P.skin], [7, 4, P.woodDark], [8, 3, P.woodDark], [9, 2, P.woodDark], [10, 1, P.woodDark]],
+  rodPull: [[6, 4, P.skin], [7, 3, P.woodDark], [7, 2, P.woodDark], [8, 1, P.woodDark], [8, 0, P.woodDark]],
+  // Both hands up, holding what came out of the water over the head.
+  holdUp: [[6, 4, P.skin], [6, 3, P.skin], [2, 4, P.skin], [2, 3, P.skin]],
+}
+
+/** Where the tip of the rod is in a pose, facing right, for drawing the line. */
+export const ROD_TIP: Partial<Record<Pose, readonly [x: number, y: number]>> = {
+  rodOut: [10, 1],
+  rodPull: [8, 0],
 }
 
 function legsFor(pose: Pose): readonly Px[] {

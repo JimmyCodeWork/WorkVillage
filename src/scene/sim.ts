@@ -12,7 +12,10 @@ export const PLOT = 12
 
 export const plotCenter = (index: number): number => index * PLOT + PLOT / 2
 
-type Phase = 'idle' | 'toWork' | 'working' | 'returning' | 'arriving'
+type Phase = 'idle' | 'toWork' | 'working' | 'returning' | 'arriving' | 'goingIn' | 'inside'
+
+/** What comes up on the line: mostly a fish, now and then something else. */
+export type Catch = 'fish' | 'boot' | 'chest'
 
 export type Walker = {
   id: number
@@ -32,6 +35,10 @@ export type Walker = {
   hop: number
   /** The villager whose job this one is lending a hand with. */
   helping?: number
+  /** The plot of the home this villager sleeps in; none sleeps by the fire. */
+  home?: number
+  /** What the line brought up, once something bites. */
+  caught?: Catch
 }
 
 /**
@@ -57,6 +64,10 @@ export type Scene = {
   chips: Chip[]
   /** A finished storehouse nearest the camp, where timber and stone are taken. */
   depot?: number
+  /** Homes by plot, one entry per bed, nearest the camp first. */
+  beds: number[]
+  /** Doors standing open, by plot, until the tick given. */
+  doors: Map<number, number>
   nextId: number
   rand: () => number
 }
@@ -88,6 +99,8 @@ const STEPS: Readonly<Record<ActionKind, readonly Step[]>> = {
   celebrate: [{ ticks: 16 }],
   study: [{ ticks: 32 }],
   ponder: [{ ticks: 24 }],
+  // Cast, wait for a bite (its length drawn at random), the bite, reeling in, holding up the catch.
+  fish: [{ ticks: 8 }, { ticks: 60 }, { ticks: 8 }, { ticks: 10 }, { ticks: 16 }],
 }
 
 /** How many villagers can work one job together, the one who took it included. */
@@ -104,6 +117,7 @@ const CREW: Readonly<Record<ActionKind, number>> = {
   celebrate: 1,
   study: 1,
   ponder: 1,
+  fish: 1,
 }
 
 /** Offset from a villager's box to its feet, for standing beside a plot. */
@@ -118,6 +132,8 @@ export function createScene(village: Village, seed = village.seed): Scene {
     holds: new Map(),
     effects: new Map(),
     chips: [],
+    beds: [],
+    doors: new Map(),
     nextId: 1,
     rand: random(seed ^ 0x5eed),
   }
@@ -173,13 +189,25 @@ export function syncScene(scene: Scene, village: Village): void {
     for (const chip of scene.chips) chip.x += shift * PLOT
     scene.holds = shifted(scene.holds, shift)
     scene.effects = shifted(scene.effects, shift)
+    scene.doors = shifted(scene.doors, shift)
     scene.camp = village.camp
   }
   scene.depot = village.plots
     .map((plot, index) => ({ plot, index }))
     .filter(({ plot }) => plot.kind === 'building' && plot.building === 'storehouse' && plot.progress >= BUILDINGS.storehouse.steps)
     .sort((a, b) => Math.abs(a.index - village.camp) - Math.abs(b.index - village.camp))[0]?.index
+  scene.beds = village.plots
+    .map((plot, index) => ({ plot, index }))
+    .filter(({ plot }) => plot.kind === 'building' && plot.progress >= BUILDINGS[plot.building].steps)
+    .sort((a, b) => Math.abs(a.index - village.camp) - Math.abs(b.index - village.camp) || a.index - b.index)
+    .flatMap(({ plot, index }) => (plot.kind === 'building' ? Array.from({ length: BUILDINGS[plot.building].housing }, () => index) : []))
   syncPopulation(scene, village)
+  // The first villager keeps the camp; the others take the beds in turn.
+  scene.walkers.forEach((w, i) => {
+    const home = i === 0 ? undefined : scene.beds[i - 1]
+    if (w.home !== home && w.phase === 'inside') leaveHome(scene, w)
+    w.home = home
+  })
 }
 
 function syncPopulation(scene: Scene, village: Village): void {
@@ -217,6 +245,10 @@ export function enqueue(scene: Scene, action: Action, village: Village): void {
 function standFor(walker: Walker, action: Action, side?: 'left' | 'right', spread = 0): { x: number; facingLeft: boolean } {
   const center = plotCenter(action.plot)
   const fromRight = side === undefined ? walker.x + 4 > center : side === 'right'
+  if (action.kind === 'fish') {
+    // On the bank, not in the water: the rod reaches out over it.
+    return fromRight ? { x: center + PLOT / 2 - 1, facingLeft: true } : { x: center - PLOT / 2 - REACH + 2, facingLeft: false }
+  }
   return fromRight
     ? { x: center + 1 + spread, facingLeft: true }
     : { x: center - REACH - 1 - spread, facingLeft: false }
@@ -245,6 +277,8 @@ function workPose(kind: ActionKind, step: number, beat: boolean): Pose {
       return 'read'
     case 'ponder':
       return beat ? 'ponder1' : 'ponder2'
+    case 'fish':
+      return step === 0 ? 'rodCast' : step === 1 ? 'rodOut' : step === 2 ? 'rodOut' : step === 3 ? 'rodPull' : 'holdUp'
     default:
       return 'stand'
   }
@@ -281,6 +315,15 @@ function startStep(scene: Scene, walker: Walker, step: number): void {
   // A long queue speeds the work along so the scene keeps up with the session.
   const pace = scene.queue.length >= BACKLOG ? 0.5 : 1
   walker.workLeft = Math.max(1, Math.round(spec.ticks * pace))
+  if (action.kind === 'fish') {
+    // Fish keep their own time, whatever is queued.
+    if (step === 1) walker.workLeft = spec.ticks + Math.floor(scene.rand() * 90)
+    else walker.workLeft = spec.ticks
+    if (step === 2) {
+      const roll = scene.rand()
+      walker.caught = roll < 0.8 ? 'fish' : roll < 0.95 ? 'boot' : 'chest'
+    }
+  }
   if (spec.effect === 'falling') {
     scene.effects.set(action.plot, { kind: 'falling', start: scene.tick, towardLeft: walker.facingLeft })
   } else if (spec.effect === 'felled') {
@@ -332,6 +375,7 @@ function finish(scene: Scene, walker: Walker): void {
     w.carry = w === bearer ? load : undefined
     w.action = undefined
     w.helping = undefined
+    w.caught = undefined
     w.step = 0
     w.phase = 'returning'
     w.targetX = w.carry !== undefined ? dropX(scene) : restSpot(scene)
@@ -358,6 +402,39 @@ function lendHand(scene: Scene, walker: Walker): boolean {
   return false
 }
 
+/** Where a villager stands to go in at a home's door. */
+function doorX(home: number): number {
+  return plotCenter(home) - 4
+}
+
+function openDoor(scene: Scene, home: number): void {
+  scene.doors.set(home, scene.tick + 6)
+}
+
+/** Comes out of the house, opening the door on the way. */
+function leaveHome(scene: Scene, walker: Walker): void {
+  if (walker.home !== undefined) openDoor(scene, walker.home)
+  walker.phase = 'idle'
+  walker.pose = 'stand'
+  walker.restUntil = scene.tick + 10
+}
+
+/**
+ * Hands that can take a job now: a villager resting, walking back
+ * empty-handed, at home (who comes out for it) or fishing (who reels in).
+ */
+function isFree(walker: Walker): boolean {
+  if (walker.helping !== undefined) return false
+  if (walker.phase === 'idle' || walker.phase === 'inside' || walker.phase === 'goingIn') return true
+  if (walker.phase === 'returning') return walker.carry === undefined
+  return walker.action?.kind === 'fish' && (walker.phase === 'toWork' || walker.phase === 'working')
+}
+
+/** Which villagers are in which house, for lit windows. */
+export function occupied(scene: Scene): Set<number> {
+  return new Set(scene.walkers.flatMap(w => (w.phase === 'inside' && w.home !== undefined ? [w.home] : [])))
+}
+
 function stepChips(scene: Scene): void {
   for (const chip of scene.chips) {
     chip.x += chip.vx
@@ -376,9 +453,11 @@ export function stepScene(scene: Scene, isNight: boolean): void {
 
   for (const walker of scene.walkers) {
     if (scene.queue.length === 0) break
-    // Free hands take the next job: an idle villager, or one walking back empty-handed.
-    const isFree = walker.phase === 'idle' || (walker.phase === 'returning' && walker.carry === undefined)
-    if (!isFree || walker.helping !== undefined) continue
+    if (!isFree(walker)) continue
+    // A job never waits on fishing: another villager free goes first, else the line comes in.
+    if (walker.action?.kind === 'fish' && scene.walkers.some(w => w !== walker && isFree(w) && w.action?.kind !== 'fish')) continue
+    if (walker.phase === 'inside') leaveHome(scene, walker)
+    walker.caught = undefined
     const action = scene.queue.shift()!
     walker.action = action
     walker.step = 0
@@ -440,6 +519,21 @@ export function stepScene(scene: Scene, isNight: boolean): void {
         }
         break
       }
+      case 'goingIn':
+        if (walker.home === undefined) {
+          walker.phase = 'idle'
+          break
+        }
+        if (walk(walker, tick)) {
+          openDoor(scene, walker.home)
+          walker.phase = 'inside'
+          walker.restUntil = tick + 40 + Math.floor(scene.rand() * 60)
+        }
+        break
+      case 'inside':
+        // Out again in the morning, or after a short visit by day.
+        if (!isNight && tick >= walker.restUntil) leaveHome(scene, walker)
+        break
       case 'returning':
         if (walk(walker, tick)) {
           walker.carry = undefined
@@ -455,6 +549,12 @@ export function stepScene(scene: Scene, isNight: boolean): void {
         }
         if (tick < walker.restUntil) break
         if (!isNight && lendHand(scene, walker)) break
+        // After dark those with a home turn in; by day one sometimes looks in for a while.
+        if (walker.home !== undefined && (isNight || scene.rand() < 0.2)) {
+          walker.phase = 'goingIn'
+          walker.targetX = doorX(walker.home)
+          break
+        }
         const spot = isNight ? 10 + scene.rand() * 6 : 6 + scene.rand() * 30
         const side = scene.rand() < 0.5 ? -1 : 1
         walker.targetX = Math.round(campX(scene) - 4 + side * spot)
@@ -478,6 +578,6 @@ export function isBusy(scene: Scene): boolean {
   return (
     scene.queue.length > 0 ||
     scene.chips.length > 0 ||
-    scene.walkers.some(w => w.phase !== 'idle' || w.x !== w.targetX)
+    scene.walkers.some(w => (w.phase !== 'idle' && w.phase !== 'inside') || w.x !== w.targetX)
   )
 }

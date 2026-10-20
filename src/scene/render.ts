@@ -2,6 +2,9 @@
 
 import { P, ROOF_COLORS, SEASON_DRIFT, SEASON_LEAVES, seasonSky, skyFor, type Sky } from '../art/palette'
 import {
+  CAUGHT_BOOT,
+  CAUGHT_CHEST,
+  CAUGHT_FISH,
   BANNER,
   BARREL,
   BENCH,
@@ -29,13 +32,13 @@ import {
   WELL,
   WORKSHOP,
 } from '../art/sprites'
-import { drawVillager, VILLAGER_HEIGHT } from '../art/villager'
+import { drawVillager, ROD_TIP, VILLAGER_HEIGHT, VILLAGER_WIDTH } from '../art/villager'
 import type { BuildingKind, PropStyle } from '../core/balance'
 import { BUILDINGS } from '../core/balance'
 import { hash01, seasonOf, wildPlot, type Look, type Plot, type Season, type Village } from '../core/world'
 import { invertMonochrome, isMono, toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
 import { CLEAR, createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
-import { FALL_TICKS, isWorked, plotCenter, PLOT, type Chip, type Effect, type Scene } from './sim'
+import { FALL_TICKS, isWorked, occupied, plotCenter, PLOT, type Catch, type Chip, type Effect, type Scene, type Walker } from './sim'
 
 /** Scene heights in pixels; a terminal row holds two. */
 export const SCENE_HEIGHTS = { small: 14, medium: 20 } as const
@@ -163,6 +166,7 @@ function drawPlot(
   tick: number,
   season: Season,
   look?: Look,
+  isDoorOpen = false,
 ): void {
   const GROUND = groundOf(canvas)
   const isWinter = season === 'winter'
@@ -200,6 +204,9 @@ function drawPlot(
       drawSprite(canvas, crop, x0 + 1, GROUND - crop.height)
       break
     }
+    case 'pond':
+      drawPond(canvas, x0, index, tick, season)
+      break
     case 'camp': {
       const fire = CAMPFIRE[Math.floor(tick / 2) % CAMPFIRE.length]!
       drawSprite(canvas, fire, centered(fire), bottomY(canvas, fire))
@@ -211,7 +218,10 @@ function drawPlot(
       const done = plot.progress >= total
       const x = centered(art)
       const y = bottomY(canvas, art)
-      const style = { recolor: look ? ROOF_COLORS[look.roof] : undefined, flip: look?.mirrored }
+      const roof = look ? ROOF_COLORS[look.roof] : new Map<number, number>()
+      // An open door shows the dark of the room behind it.
+      const recolor = isDoorOpen ? new Map([...roof, [P.door, P.outline]]) : roof
+      const style = { recolor, flip: look?.mirrored }
       if (done) {
         drawSprite(canvas, art, x, y, style)
         if (isWinter) {
@@ -234,6 +244,74 @@ function drawPlot(
       }
       break
     }
+  }
+}
+
+const WATER = { surface: 0x5b93cf, deep: 0x3f6fae, glint: 0xa9d2f2 }
+const ICE = { surface: 0xcfe3ef, deep: 0xa9c8dc, glint: P.white }
+
+/** A pond set into the ground, with reeds at its banks; frozen over in winter. */
+function drawPond(canvas: Canvas, x0: number, index: number, tick: number, season: Season): void {
+  const GROUND = groundOf(canvas)
+  const water = season === 'winter' ? ICE : WATER
+  fillRect(canvas, x0 + 1, GROUND, PLOT - 2, 1, water.surface)
+  fillRect(canvas, x0 + 2, GROUND + 1, PLOT - 4, canvas.height - GROUND - 1, water.deep)
+  // A glint drifting across the surface.
+  setPixel(canvas, x0 + 2 + ((Math.floor(tick / 5) + index * 3) % (PLOT - 4)), GROUND, water.glint)
+  if (season !== 'winter') {
+    setPixel(canvas, x0 + 7, GROUND, P.leaf)
+    setPixel(canvas, x0 + 8, GROUND, P.leafDark)
+  }
+  const reed = season === 'autumn' || season === 'winter' ? P.thatchDark : P.crop
+  for (const [x, height] of [[x0, 3], [x0 + 1, 2], [x0 + PLOT - 1, 2]] as const) {
+    for (let k = 1; k <= height; k++) setPixel(canvas, x, GROUND - k, reed)
+  }
+  setPixel(canvas, x0, GROUND - 3, P.woodDark)
+}
+
+const CAUGHT: Readonly<Record<Catch, Sprite>> = { fish: CAUGHT_FISH, boot: CAUGHT_BOOT, chest: CAUGHT_CHEST }
+
+/**
+ * The fishing line and float for a villager at the pond: the float bobbing
+ * while it waits, pulled under at a bite with a start of surprise, drawn in
+ * as the line is reeled, and the catch held up at the end.
+ */
+function drawFishing(canvas: Canvas, w: Walker, camera: number, tick: number): void {
+  if (w.phase !== 'working' || w.action?.kind !== 'fish') return
+  const GROUND = groundOf(canvas)
+  const top = GROUND + 2 - VILLAGER_HEIGHT + w.hop
+  const x = Math.round(w.x - camera)
+  if (w.step === 4 && w.caught) {
+    const art = CAUGHT[w.caught]
+    drawSprite(canvas, art, x + Math.floor((VILLAGER_WIDTH - art.width) / 2), top - art.height + 1)
+    return
+  }
+  if (w.step === 2) {
+    // A start of surprise as the float goes under.
+    for (const dy of [-4, -3, -1]) setPixel(canvas, x + 4, top + dy, P.fireCore)
+  }
+  const tip = ROD_TIP[w.pose]
+  if (!tip) return
+  const tipX = x + (w.facingLeft ? VILLAGER_WIDTH - 1 - tip[0] : tip[0])
+  const tipY = top + tip[1]
+  const pond = Math.round(plotCenter(w.action.plot) - camera)
+  const reel = w.step === 3 ? Math.max(0, w.workLeft) / 10 : 1
+  const floatX = Math.round(tipX + (pond - tipX) * reel)
+  const sunk = w.step === 2
+  const floatY = sunk ? GROUND : w.step === 3 ? GROUND - 1 - Math.round((1 - reel) * 3) : GROUND - 1 + (Math.floor(tick / 6) % 2)
+  const steps = Math.max(Math.abs(floatX - tipX), Math.abs(floatY - tipY), 1)
+  const sag = w.step === 1 ? 2 : 0.5
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps
+    const lx = Math.round(tipX + (floatX - tipX) * t)
+    const ly = Math.round(tipY + (floatY - tipY) * t + Math.sin(Math.PI * t) * sag)
+    setPixel(canvas, lx, ly, 0xd9dde2)
+  }
+  if (sunk) {
+    setPixel(canvas, floatX - 1, GROUND, WATER.glint)
+    setPixel(canvas, floatX + 1, GROUND, WATER.glint)
+  } else {
+    setPixel(canvas, floatX, floatY, P.ember)
   }
 }
 
@@ -416,6 +494,7 @@ export function renderFrame(
   const first = Math.floor(camera / PLOT) - 1
   const last = Math.ceil((camera + width) / PLOT) + 1
   const lit: { sprite: Sprite; x: number; y: number; flip: boolean }[] = []
+  const homes = occupied(scene)
   for (let index = first; index <= last; index++) {
     const inside = index >= 0 && index < village.plots.length
     const plot = inside ? (scene.holds.get(index) ?? village.plots[index]!) : wildPlot(village.seed, index - village.camp)
@@ -424,10 +503,12 @@ export function renderFrame(
     const shake = inside && plot.kind === 'tree' && isWorked(scene, index) ? (Math.floor(tick / 3) % 2 === 0 ? 1 : -1) : 0
     const look = plot.kind === 'building' ? lookOf(village, index, plot) : undefined
     if (effect) drawEffect(canvas, effect, plot, x0, tick, season)
-    else drawPlot(canvas, plot, x0, village.seed, index, shake, tick, season, look)
+    else drawPlot(canvas, plot, x0, village.seed, index, shake, tick, season, look, (scene.doors.get(index) ?? 0) > tick)
     if (plot.kind === 'building' && look && plot.progress >= BUILDINGS[plot.building].steps) {
       const art = BUILDING_ART[plot.building]
-      lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
+      // A home's windows light up only while someone is in.
+      const isLit = BUILDINGS[plot.building].housing === 0 || homes.has(index)
+      if (isLit) lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
       if (look.prop === 'lantern' && plot.building !== 'well') {
         lit.push({ sprite: LANTERN, x: propAt(look, x0, LANTERN), y: GROUND + 1 - LANTERN.height, flip: false })
       }
@@ -439,7 +520,9 @@ export function renderFrame(
 
   const sorted = [...scene.walkers].sort((a, b) => a.id - b.id)
   for (const w of sorted) {
+    if (w.phase === 'inside') continue
     drawVillager(canvas, w.x - camera, GROUND + 2 - VILLAGER_HEIGHT + w.hop, w.pose, w.tunic, w.facingLeft)
+    drawFishing(canvas, w, camera, tick)
   }
   drawChips(canvas, scene, camera)
   drawDrift(canvas, season, tick, village.seed, camera)
