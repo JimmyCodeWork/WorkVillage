@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.2 - 2026-10-20
 
 - Dozing is now an occasional thing each villager does on their own, rather than the whole village
   falling asleep at once. A villager at rest may doze off where it sits or go home for a nap, more
