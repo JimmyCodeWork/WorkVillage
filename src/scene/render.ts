@@ -2,6 +2,7 @@
 
 import { P, ROOF_COLORS, SEASON_DRIFT, SEASON_LEAVES, seasonSky, skyFor, type Sky } from '../art/palette'
 import {
+  STREET_LAMP,
   BUSHES,
   FLOWERS,
   WEEDS,
@@ -40,7 +41,7 @@ import { BUILDINGS } from '../core/balance'
 import { hash01, seasonOf, wildPlot, type Look, type Plot, type Season, type Village } from '../core/world'
 import { invertMonochrome, isMono, toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
 import { CLEAR, createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
-import { FALL_TICKS, isWorked, occupied, plotCenter, PLOT, type Catch, type Chip, type Effect, type Rooster, type Scene, type Walker } from './sim'
+import { FALL_TICKS, isDozing, isWorked, occupied, plotCenter, PLOT, type Catch, type Chip, type Effect, type Rooster, type Scene, type Walker } from './sim'
 
 /** Scene heights in pixels; a terminal row holds two. */
 export const SCENE_HEIGHTS = { small: 14, medium: 20 } as const
@@ -559,19 +560,28 @@ function drawStockpile(canvas: Canvas, village: Village, x: number): void {
   for (let i = 0; i < logs; i++) drawSprite(canvas, LOG, x, GROUND - 1 - i * 2)
 }
 
-function nightShade(canvas: Canvas, background: Int32Array, sky: Sky, fireX: number): void {
+/** A pool of warm light after dark: the fire, a street lamp. */
+type Light = { x: number; y: number; radius: number; strength: number }
+
+function nightShade(canvas: Canvas, background: Int32Array, sky: Sky, lights: readonly Light[]): void {
   if (sky.dim <= 0) return
-  const GROUND = groundOf(canvas)
   const night = 0x0d1328
+  // Each light's share of the warm glow, the fire's being the strongest.
+  const strongest = Math.max(...lights.map(l => l.strength))
   for (let y = 0; y < canvas.height; y++) {
     for (let x = 0; x < canvas.width; x++) {
       const i = y * canvas.width + x
       const color = canvas.pixels[i]!
-      const dist = Math.hypot(x - fireX, (y - (GROUND - 3)) * 1.4)
-      const glow = sky.stars ? Math.max(0, 1 - dist / 22) : 0
+      let glow = 0
+      if (sky.stars) {
+        for (const light of lights) {
+          const dist = Math.hypot(x - light.x, (y - light.y) * 1.4)
+          glow = Math.max(glow, Math.max(0, 1 - dist / light.radius) * (light.strength / strongest))
+        }
+      }
       // The backdrop is already drawn in night colours; dim only what stands on it.
       const dimmed = color === background[i] ? color : mix(color, night, sky.dim * (1 - glow))
-      canvas.pixels[i] = glow > 0 ? mix(dimmed, P.fire, glow * 0.18) : dimmed
+      canvas.pixels[i] = glow > 0 ? mix(dimmed, P.fire, glow * strongest) : dimmed
     }
   }
 }
@@ -606,6 +616,7 @@ export function renderFrame(
   const last = Math.ceil((camera + width) / PLOT) + 1
   const lit: { sprite: Sprite; x: number; y: number; flip: boolean }[] = []
   const homes = occupied(scene)
+  const sleepers = new Set(scene.walkers.flatMap(w => (w.phase === 'inside' && w.isNapping && w.home !== undefined ? [w.home] : [])))
   const naps: { x: number; y: number; seed: number }[] = []
   for (let index = first; index <= last; index++) {
     const inside = index >= 0 && index < village.plots.length
@@ -620,8 +631,8 @@ export function renderFrame(
       const art = BUILDING_ART[plot.building]
       // A home's windows light up only while someone is in.
       const isLit = BUILDINGS[plot.building].housing === 0 || homes.has(index)
-      // Someone napping inside snores over the roof.
-      if (scene.isDozing && homes.has(index)) {
+      // Someone asleep inside, napping by day or in bed at night, snores over the roof.
+      if (sleepers.has(index) || (sky.stars && homes.has(index))) {
         naps.push({ x: x0 + Math.floor((PLOT - art.width) / 2) + (look.mirrored ? 1 : art.width - 5), y: bottomY(canvas, art) - 1, seed: index })
       }
       if (isLit) lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
@@ -633,6 +644,16 @@ export function renderFrame(
 
   const fireX = plotCenter(village.camp) - camera
   drawStockpile(canvas, village, fireX + 4)
+  const lights: Light[] = [{ x: fireX, y: GROUND - 3, radius: 22, strength: 0.18 }]
+  for (const lampX of scene.lamps) {
+    const x = lampX - camera - 1
+    if (x < -12 || x > width + 12) continue
+    const y = GROUND + 1 - STREET_LAMP.height
+    drawSprite(canvas, STREET_LAMP, x, y)
+    if (season === 'winter') drawSnowCap(canvas, STREET_LAMP, x, y, false)
+    lit.push({ sprite: STREET_LAMP, x, y, flip: false })
+    lights.push({ x: x + 1, y: y + 1, radius: 10, strength: 0.12 })
+  }
 
   const sorted = [...scene.walkers].sort((a, b) => a.id - b.id)
   drawBugs(canvas, scene, camera)
@@ -640,14 +661,14 @@ export function renderFrame(
     if (w.phase === 'inside' || w.phase === 'away') continue
     drawVillager(canvas, w.x - camera, GROUND + 2 - VILLAGER_HEIGHT + w.hop, w.pose, w.tunic, w.facingLeft)
     drawFishing(canvas, w, camera, tick)
-    if (scene.isDozing && w.phase === 'idle' && w.x === w.targetX) drawSnore(canvas, w, camera, tick)
+    if (w.phase === 'idle' && w.x === w.targetX && isDozing(w, tick)) drawSnore(canvas, w, camera, tick)
   }
   for (const nap of naps) drawZ(canvas, nap.x, nap.y, tick, nap.seed)
-  drawRooster(canvas, scene.rooster, camera, tick, scene.isDozing || sky.stars)
+  drawRooster(canvas, scene.rooster, camera, tick, sky.stars || (scene.rooster.dozeUntil ?? 0) > tick)
   drawChips(canvas, scene, camera)
   drawDrift(canvas, season, tick, village.seed, camera)
 
-  nightShade(canvas, background, sky, fireX)
+  nightShade(canvas, background, sky, lights)
   if (sky.dim > 0) {
     // Fires and windows keep their light after dark.
     const fire = sky.stars ? CAMPFIRE[Math.floor(tick / 2) % CAMPFIRE.length]! : EMBERS

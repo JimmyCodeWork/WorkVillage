@@ -87,9 +87,11 @@ with the work under way, and once a storehouse stands, timber and stone are carr
 Buildings are raised in order: Tent, Hut, Well, Storehouse, House, Workshop and Watchtower.
 Each costs timber and stone and takes several steps of work to finish. When the trees near the
 camp are gone, the clearing extends further into the forest. The sky follows your local time.
-Villagers with a home go in after dark, and its windows light up while someone is in; the one who
-keeps the camp stays by the fire. By day they now and then look in at home, and work that comes in
-at night brings someone out of the house.
+Villagers with a home go to bed after dark, and its windows light up while someone is in; the one
+who keeps the camp stays by the fire. Now and then someone gets up for a walk in the night before
+going back to bed. By day they now and then look in at home, and work that comes in at night brings
+someone out of the house. Once the village is a hamlet, street lamps go up along it and light up
+after dark.
 
 The wild has ponds in it, and a village with none near digs one once it has a few buildings. In
 quiet moments a villager goes fishing: the float bobs, something bites, and the villager holds up
@@ -98,8 +100,9 @@ comes in when there is a job to do.
 
 Now and then something else happens in the village. A bug may crawl out of the forest and scuttle
 about until the villagers catch it. A villager may set out on an errand, walk out of sight and come
-back later with a sack of finds. After a long quiet the villagers go home for a nap, snoring over
-the roof, while the one who keeps the camp dozes by the fire, until work wakes the village.
+back later with a sack of finds. Now and then a villager dozes off where it sits, or goes home for
+a nap with a Z drifting over the roof, the more often the longer things stay quiet, while the rest
+carry on. Work wakes whoever is dozing with a start.
 
 The village keeps a rooster. It scratches about the camp by day, pecking at the ground, dozes when
 the village does, sleeps by the fire at night, and crows when night turns to day.

@@ -300,6 +300,9 @@ export const CAUGHT_FISH = s(['.QQq.', 'QQQQq', '.QQq.'])
 export const CAUGHT_BOOT = s(['dd.', 'dd.', 'ddd'])
 export const CAUGHT_CHEST = s(['wWWw', 'dzzd', 'dddd'])
 
+/** A street lamp on an iron post; its glass is lit after dark. */
+export const STREET_LAMP = s(['.k.', 'kik', 'kik', '.k.', '.k.', '.k.', '.k.', 'kkk'])
+
 /** The village rooster, facing right: walking, pecking, sitting and crowing at dawn. Red comb and wattle, yellow legs. */
 export const ROOSTER: Readonly<Record<'walk1' | 'walk2' | 'stand' | 'peck' | 'sit' | 'crow', Sprite>> = {
   stand: s(['...j.', 'u..uF', 'uuuuj', '.uuu.', '.z.z.']),
