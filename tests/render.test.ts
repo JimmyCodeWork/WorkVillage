@@ -483,22 +483,33 @@ describe('meadows', () => {
 })
 
 describe('street lamps', () => {
-  test('lamps go up once the village is a hamlet, and light up after dark', () => {
-    expect(lampsOf(createVillage(21, 0))).toEqual([])
+  test('lamps the villagers put up are drawn on their edges, lit after dark', () => {
     let v = createVillage(21, 0)
     const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
-    for (let i = 0; i < 90; i++) v = applySignal(v, signals[i % signals.length]!).village
-    const lamps = lampsOf(v)
-    expect(lamps.length).toBeGreaterThan(0)
-    // Never squeezed between two buildings.
-    for (const x of lamps) {
-      const left = v.plots[x / 12 - 1]
-      const right = v.plots[x / 12]
-      expect(left?.kind === 'building' && right?.kind === 'building').toBe(false)
-    }
+    for (let i = 0; i < 150; i++) v = applySignal(v, signals[i % signals.length]!).village
+    expect(v.lamps.length).toBeGreaterThan(0)
+    expect(lampsOf(v)).toEqual(v.lamps.map(i => i * 12))
     const scene = createScene(v)
+    expect(scene.lamps).toEqual(lampsOf(v))
     scene.walkers = []
     const night = renderFrame(v, scene, 400, { hour: 23 }, { height: 20 })
     expect(new Set(night.pixels).has(0xf2d27a)).toBe(true)
+  })
+})
+
+describe('the fountain', () => {
+  test('its water plays by day and freezes in winter', () => {
+    const v = createVillage(21, 0)
+    const plots = v.plots.map((p, i) => (i === v.camp + 1 ? ({ kind: 'building', building: 'fountain', progress: 8 } as const) : p))
+    const village = { ...v, plots }
+    const scene = createScene(village)
+    scene.walkers = []
+    const frames = [0, 1, 2, 3].map(() => {
+      for (let i = 0; i < 2; i++) stepScene(scene, false)
+      return Array.from(renderFrame(village, scene, 80, { hour: 12 }, { height: 20 }).pixels).join()
+    })
+    expect(new Set(frames).size).toBeGreaterThan(1)
+    const winter = { ...village, stats: { ...village.stats, actions: 3 * 40 } }
+    expect(new Set(renderFrame(winter, scene, 80, { hour: 12 }, { height: 20 }).pixels).has(0xa9d2f2)).toBe(false)
   })
 })

@@ -21,6 +21,7 @@ export const en = {
   'building.house': 'House',
   'building.workshop': 'Workshop',
   'building.tower': 'Watchtower',
+  'building.fountain': 'Fountain',
 
   'resource.wood': 'Timber',
   'resource.stone': 'Stone',

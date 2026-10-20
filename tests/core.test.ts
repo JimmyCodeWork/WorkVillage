@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { BUILDINGS, SEASON_ACTIONS } from '../src/core/balance'
-import { applySignal, createVillage, isComplete, pondNear, restore, seasonOf, stageOf, wildPlot, withStyles, type Signal, type Village } from '../src/core/world'
+import { applySignal, createVillage, isComplete, lampSpots, nextBuilding, pondNear, restore, seasonOf, stageOf, wildPlot, withStyles, type Signal, type Village } from '../src/core/world'
 
 function run(village: Village, signals: readonly Signal[]): Village {
   return signals.reduce((v, s) => applySignal(v, s).village, village)
@@ -235,3 +235,56 @@ describe('event rewards', () => {
     expect(scout.stats.actions).toBe(v.stats.actions)
   })
 })
+
+describe('lamps and the fountain', () => {
+  const grow = (village: Village, count: number) =>
+    run(village, Array.from({ length: count }, (_, i) => (['edit', 'edit', 'commit', 'task', 'create'] as const)[i % 5]!))
+
+  test('lamps are built, for timber and stone, only once the village is a hamlet', () => {
+    const camp = grow(createVillage(21, 0), 6)
+    expect(camp.lamps).toEqual([])
+    const grown = grow(createVillage(21, 0), 150)
+    expect(grown.lamps.length).toBeGreaterThan(0)
+    // Every lamp stands on an edge between settled plots, and no two share one.
+    expect(new Set(grown.lamps).size).toBe(grown.lamps.length)
+    for (const i of grown.lamps) expect(['tree', 'rock', 'stump', 'pond']).not.toContain(grown.plots[i - 1]?.kind)
+  })
+
+  test('a lamp costs what it says, and is put up between buildings while saving for the next', () => {
+    let v = grow(createVillage(21, 0), 60)
+    v = {
+      ...v,
+      plots: v.plots.map(p => (p.kind === 'building' ? { ...p, progress: BUILDINGS[p.building].steps } : p)),
+      resources: { wood: 3, stone: 3, food: 0, knowledge: 0 },
+      stats: { ...v.stats, edits: 3 },
+      lamps: [],
+    }
+    const spots = lampSpots(v)
+    expect(spots.length).toBeGreaterThan(0)
+    const outcome = applySignal(v, 'edit')
+    expect(outcome.village.lamps).toEqual([spots[0]])
+    expect(outcome.village.resources.wood).toBe(1)
+    expect(outcome.village.resources.stone).toBe(0)
+  })
+
+  test('there is one fountain, built once the village has enough buildings, outside the fixed order', () => {
+    const v = grow(createVillage(21, 0), 900)
+    expect(v.plots.filter(p => p.kind === 'building' && p.building === 'fountain').length).toBe(1)
+    expect(nextBuilding(v)).not.toBe('fountain')
+    // Without it, a village of six buildings builds the fountain next, whatever the order says.
+    const without = { ...v, plots: v.plots.map(p => (p.kind === 'building' && p.building === 'fountain' ? ({ kind: 'grass' } as const) : p)) }
+    expect(nextBuilding(without)).toBe('fountain')
+    const young = grow(createVillage(21, 0), 20)
+    expect(nextBuilding(young)).not.toBe('fountain')
+  })
+
+  test('lamps load back; anything else in their place is refused', () => {
+    const v = JSON.parse(JSON.stringify(grow(createVillage(21, 0), 150)))
+    expect(restore(v)?.lamps).toEqual(v.lamps)
+    const { lamps: _, ...old } = v
+    expect(restore(old)?.lamps).toEqual([])
+    expect(restore({ ...v, lamps: [0] })).toBeUndefined()
+    expect(restore({ ...v, lamps: [2, 2] })).toBeUndefined()
+  })
+})
+

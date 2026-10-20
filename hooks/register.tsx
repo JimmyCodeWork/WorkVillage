@@ -3,7 +3,7 @@ import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 
 import type { WorkvillageTransfer } from '../types'
 import { decodeArchive, encodeArchive, type Archive } from '../src/core/archive'
-import { BUILD_ORDER, BUILDINGS } from '../src/core/balance'
+import { BUILDINGS } from '../src/core/balance'
 import {
   foundStyles,
   isVillageKey,
@@ -22,6 +22,7 @@ import {
   builtCount,
   createVillage,
   isComplete,
+  nextBuilding,
   restore,
   seasonOf,
   stageOf,
@@ -213,7 +214,7 @@ function progressLine(): string {
     const percent = Math.floor((site.progress / BUILDINGS[site.building].steps) * 100)
     return t('summary.building', { building: t(`building.${site.building}`), percent })
   }
-  const next = BUILD_ORDER[Math.min(village.nextBuild, BUILD_ORDER.length - 1)]!
+  const next = nextBuilding(village)
   const cost = BUILDINGS[next].cost
   return t('summary.next', { building: t(`building.${next}`), wood: cost.wood, stone: cost.stone })
 }

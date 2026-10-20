@@ -1,6 +1,6 @@
 // Every number that shapes how fast the village grows, in one place.
 
-export type BuildingKind = 'tent' | 'hut' | 'well' | 'storehouse' | 'house' | 'workshop' | 'tower'
+export type BuildingKind = 'tent' | 'hut' | 'well' | 'storehouse' | 'house' | 'workshop' | 'tower' | 'fountain'
 
 export type BuildingSpec = {
   cost: { wood: number; stone: number }
@@ -18,6 +18,7 @@ export const BUILDINGS: Readonly<Record<BuildingKind, BuildingSpec>> = {
   house: { cost: { wood: 14, stone: 8 }, steps: 8, housing: 3 },
   workshop: { cost: { wood: 16, stone: 10 }, steps: 8, housing: 1 },
   tower: { cost: { wood: 18, stone: 16 }, steps: 10, housing: 1 },
+  fountain: { cost: { wood: 4, stone: 20 }, steps: 8, housing: 0 },
 }
 
 /** The order buildings are raised in; the last one repeats. */
@@ -113,3 +114,10 @@ export const ACCENT_SHARE = 0.5
 
 /** Actions (signals other than turns) a season lasts; a year is four of them. */
 export const SEASON_ACTIONS = 40
+
+/** A village builds one fountain, as its next building once it has this many. */
+export const FOUNTAIN_AFTER_BUILT = 6
+
+/** A street lamp: what it costs, and how often one goes up while timber and stone are saved for the next building. */
+export const LAMP = { cost: { wood: 2, stone: 3 }, everyEdits: 4 } as const
+

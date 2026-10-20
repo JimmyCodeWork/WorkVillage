@@ -23,6 +23,7 @@ export const zhTW: Messages = {
   'building.house': '民宅',
   'building.workshop': '工坊',
   'building.tower': '瞭望塔',
+  'building.fountain': '噴泉',
 
   'resource.wood': '木材',
   'resource.stone': '石材',

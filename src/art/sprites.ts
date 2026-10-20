@@ -300,6 +300,17 @@ export const CAUGHT_FISH = s(['.QQq.', 'QQQQq', '.QQq.'])
 export const CAUGHT_BOOT = s(['dd.', 'dd.', 'ddd'])
 export const CAUGHT_CHEST = s(['wWWw', 'dzzd', 'dddd'])
 
+/** The village fountain: a stone basin with a spout; the water itself is drawn as it plays. */
+export const FOUNTAIN = s([
+  '....QR....',
+  '....Rq....',
+  '...QRRq...',
+  '.QRRRRRRq.',
+  'QaaaaaaaaQ',
+  'RRQRRQRRQq',
+  'qqqqqqqqqq',
+])
+
 /** A street lamp on an iron post; its glass is lit after dark. */
 export const STREET_LAMP = s(['.k.', 'kik', 'kik', '.k.', '.k.', '.k.', '.k.', 'kkk'])
 

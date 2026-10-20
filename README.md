@@ -84,14 +84,15 @@ Villagers see each job through: a tree takes many blows of the axe, falls and is
 and a boulder is struck until it cracks and breaks apart. Villagers with nothing to do lend a hand
 with the work under way, and once a storehouse stands, timber and stone are carried there.
 
-Buildings are raised in order: Tent, Hut, Well, Storehouse, House, Workshop and Watchtower.
+Buildings are raised in order: Tent, Hut, Well, Storehouse, House, Workshop and Watchtower, and,
+once there are enough of them, a single fountain whose water plays by day and freezes in winter.
 Each costs timber and stone and takes several steps of work to finish. When the trees near the
 camp are gone, the clearing extends further into the forest. The sky follows your local time.
 Villagers with a home go to bed after dark, and its windows light up while someone is in; the one
 who keeps the camp stays by the fire. Now and then someone gets up for a walk in the night before
 going back to bed. By day they now and then look in at home, and work that comes in at night brings
-someone out of the house. Once the village is a hamlet, street lamps go up along it and light up
-after dark.
+someone out of the house. Once the village is a hamlet, the villagers now and then put up a street
+lamp while they save for the next building, and the lamps light up after dark.
 
 The wild has ponds in it, and a village with none near digs one once it has a few buildings. In
 quiet moments a villager goes fishing: the float bobs, something bites, and the villager holds up

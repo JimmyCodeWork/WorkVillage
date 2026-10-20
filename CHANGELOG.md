@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Street lamps are now built by the villagers rather than appearing on their own. Once the village
+  is a hamlet, while timber and stone are saved for the next building, a villager now and then puts
+  up a lamp for a little timber and stone, on the same edges as before. Lamps are kept with the
+  village; villages from before start without any and build them in time.
+- A village builds one small fountain, as its next building once it has six. Its water plays by day
+  and freezes in winter. Villages that already have six buildings build theirs next. The fixed
+  building order otherwise carries on where it was.
+
 ## 0.3.2 - 2026-10-20
 
 - Dozing is now an occasional thing each villager does on their own, rather than the whole village

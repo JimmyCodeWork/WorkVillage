@@ -2,6 +2,7 @@
 
 import { P, ROOF_COLORS, SEASON_DRIFT, SEASON_LEAVES, seasonSky, skyFor, type Sky } from '../art/palette'
 import {
+  FOUNTAIN,
   STREET_LAMP,
   BUSHES,
   FLOWERS,
@@ -64,6 +65,7 @@ const BUILDING_ART: Readonly<Record<BuildingKind, Sprite>> = {
   house: HOUSE,
   workshop: WORKSHOP,
   tower: TOWER,
+  fountain: FOUNTAIN,
 }
 
 const PROP_ART: Readonly<Record<Exclude<PropStyle, 'none'>, Sprite>> = {
@@ -224,11 +226,12 @@ function drawPlot(
       const style = { recolor, flip: look?.mirrored }
       if (done) {
         drawSprite(canvas, art, x, y, style)
+        if (plot.building === 'fountain') drawFountainWater(canvas, x, y, tick, isWinter)
         if (isWinter) {
           drawSnowCap(canvas, art, x, y, style.flip === true)
           if (plot.building === 'house') drawSmoke(canvas, x + (style.flip ? 1 : art.width - 3), y, tick)
         }
-        if (look && look.prop !== 'none' && plot.building !== 'well') {
+        if (look && look.prop !== 'none' && plot.building !== 'well' && plot.building !== 'fountain') {
           const prop = PROP_ART[look.prop]
           drawSprite(canvas, prop, propAt(look, x0, prop), GROUND + 1 - prop.height, style)
         }
@@ -424,6 +427,33 @@ function drawGroundCover(canvas: Canvas, seed: number, camera: number, season: S
       setPixel(canvas, x, GROUND - 2, PETALS[Math.floor(hash01(seed + 84, wx) * PETALS.length)]!)
     }
   }
+}
+
+const SPRAY = { jet: 0xa9d2f2, drop: 0x5b93cf, ice: 0xdcecf5 } as const
+
+/**
+ * The fountain's water: a jet rising from the spout and falling back into
+ * the basin on both sides, the drops moving down as it plays. Frozen in
+ * winter, with ice in the basin and no jet.
+ */
+function drawFountainWater(canvas: Canvas, x: number, y: number, tick: number, isWinter: boolean): void {
+  const spout = x + 4
+  if (isWinter) {
+    for (let dx = 1; dx < 9; dx++) setPixel(canvas, x + dx, y + 4, dx % 3 === 0 ? P.white : SPRAY.ice)
+    return
+  }
+  const phase = Math.floor(tick / 2) % 4
+  // The jet, flickering at its top.
+  for (let k = 1; k <= 3; k++) setPixel(canvas, spout + (k === 3 && phase % 2 === 0 ? 1 : 0), y - k, SPRAY.jet)
+  // Drops falling on either side, a step further down each frame.
+  for (const side of [-1, 1] as const) {
+    for (let d = 0; d < 2; d++) {
+      const fall = (phase + d * 2) % 4
+      setPixel(canvas, spout + (side < 0 ? -1 - Math.floor(fall / 2) : 2 + Math.floor(fall / 2)), y - 3 + fall + 1, SPRAY.drop)
+    }
+  }
+  // A ripple running round the basin.
+  setPixel(canvas, x + 1 + ((tick >> 2) % 8), y + 4, SPRAY.jet)
 }
 
 /** Snow on whatever is uppermost in each column of a sprite. */
@@ -636,7 +666,7 @@ export function renderFrame(
         naps.push({ x: x0 + Math.floor((PLOT - art.width) / 2) + (look.mirrored ? 1 : art.width - 5), y: bottomY(canvas, art) - 1, seed: index })
       }
       if (isLit) lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
-      if (look.prop === 'lantern' && plot.building !== 'well') {
+      if (look.prop === 'lantern' && plot.building !== 'well' && plot.building !== 'fountain') {
         lit.push({ sprite: LANTERN, x: propAt(look, x0, LANTERN), y: GROUND + 1 - LANTERN.height, flip: false })
       }
     }

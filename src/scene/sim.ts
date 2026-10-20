@@ -5,7 +5,7 @@
 import { TUNICS } from '../art/palette'
 import type { Pose } from '../art/villager'
 import { BUILDINGS } from '../core/balance'
-import { builtCount, random, type Action, type ActionKind, type Plot, type Village } from '../core/world'
+import { random, type Action, type ActionKind, type Plot, type Village } from '../core/world'
 
 /** Pixels per plot, along the ground. */
 export const PLOT = 12
@@ -104,7 +104,7 @@ export type Scene = {
   /** How drowsy a long quiet has made the village, 0 to 1: the more, the likelier a doze. */
   drowsiness: number
   rooster: Rooster
-  /** Street lamps, by their x in world pixels, once the village has grown into a hamlet. */
+  /** The street lamps the villagers have put up, by their x in world pixels. */
   lamps: number[]
   /** Whether it was night at the last step, to catch the dawn. */
   wasNight?: boolean
@@ -280,25 +280,9 @@ export function syncScene(scene: Scene, village: Village): void {
   })
 }
 
-/** Open, settled ground: where a lamp may stand beside it. */
-function isSettled(plot: Plot | undefined): boolean {
-  return plot !== undefined && (plot.kind === 'building' || plot.kind === 'grass' || plot.kind === 'farm' || plot.kind === 'camp')
-}
-
-/**
- * Where the street lamps stand: once the village is a hamlet, on every third
- * edge between two settled plots, and never squeezed between two buildings.
- */
+/** Where the street lamps the villagers have put up stand, by their x in world pixels. */
 export function lampsOf(village: Village): number[] {
-  if (builtCount(village) < 2) return []
-  const lamps: number[] = []
-  for (let i = 0; i + 1 < village.plots.length; i++) {
-    const [a, b] = [village.plots[i], village.plots[i + 1]]
-    if (!isSettled(a) || !isSettled(b) || (a!.kind === 'building' && b!.kind === 'building')) continue
-    if ((((i - village.camp) % 3) + 3) % 3 !== 1) continue
-    lamps.push((i + 1) * PLOT)
-  }
-  return lamps
+  return village.lamps.map(i => i * PLOT)
 }
 
 function syncPopulation(scene: Scene, village: Village): void {
