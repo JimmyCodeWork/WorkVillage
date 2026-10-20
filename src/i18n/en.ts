@@ -21,6 +21,7 @@ export const en = {
   'building.house': 'House',
   'building.workshop': 'Workshop',
   'building.tower': 'Watchtower',
+  'building.fountain': 'Fountain',
 
   'resource.wood': 'Timber',
   'resource.stone': 'Stone',
@@ -43,6 +44,7 @@ export const en = {
   'season.winter': 'Winter',
   'summary.next': 'Next: {building} ({wood} timber, {stone} stone)',
   'summary.building': 'Building: {building} {percent}%',
+  'summary.complete': 'Everything is built; the villagers tend the village.',
   'pane.stats': 'Activity',
   'pane.resources': 'Resources',
   'pane.wide': 'Widen the window to see the village.',

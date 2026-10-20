@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.3 - 2026-10-20
+
+- Buildings are no longer raised in one fixed order. After its first tent, each village picks its
+  next building at random among the kinds it may build now: huts early on, then wells, storehouses,
+  houses, workshops and watchtowers as the village grows, each kept to a sensible number for a
+  village of that size. Homes go up only while there is room for more villagers, and once
+  everything a village wants is built it starts no new site. The same village always grows the same
+  way.
+- A village builds one small fountain, as its next building once it has six. Its water plays by day
+  and freezes in winter. Villages that already have six buildings build theirs next.
+- As the village grows, its tent is taken down and rebuilt as a hut, and later its huts as houses.
+  Those living there keep their home while it is rebuilt, and the village keeps its stage.
+- Buildings go where they suit: the plot beside the fire is kept free as the village square until
+  the fountain stands there, in the middle of the village; the watchtower goes up on the outer edge
+  facing the forest; new fields are broken on the outskirts; the rest are built near the fire as
+  before. Villages whose square is already taken build the fountain on the nearest open ground.
+- Street lamps are now built by the villagers rather than appearing on their own. Once the village
+  is a hamlet, while timber and stone are saved for the next building, a villager now and then puts
+  up a lamp for a little timber and stone, on the same edges as before. Lamps are kept with the
+  village; villages from before start without any and build them in time.
+- No more than twenty villagers live in a village, and a house now homes two instead of three, so the
+  band never crowds; villagers already living there stay. By day each villager rests and wanders
+  near its own home rather than all round the fire.
+- The rooster now comes once the village is a hamlet, wandering in from the edge of the clearing,
+  instead of being there from the first camp.
+
 ## 0.3.2 - 2026-10-20
 
 - Dozing is now an occasional thing each villager does on their own, rather than the whole village

@@ -104,7 +104,9 @@ export type Scene = {
   /** How drowsy a long quiet has made the village, 0 to 1: the more, the likelier a doze. */
   drowsiness: number
   rooster: Rooster
-  /** Street lamps, by their x in world pixels, once the village has grown into a hamlet. */
+  /** Whether the village keeps a rooster yet: one comes once it is a hamlet. */
+  hasRooster: boolean
+  /** The street lamps the villagers have put up, by their x in world pixels. */
   lamps: number[]
   /** Whether it was night at the last step, to catch the dawn. */
   wasNight?: boolean
@@ -178,6 +180,8 @@ const DOZE_CHANCE = { alert: 0.03, drowsy: 0.28 } as const
 const STROLL_CHANCE = 0.15
 /** Share of the villagers that may be up and about at once in the night. */
 const MAX_STROLLING = 0.25
+/** Buildings a village has before a rooster comes to live there. */
+export const ROOSTER_AFTER_BUILT = 2
 /** How long the rooster crows when night turns to day. */
 export const CROW_TICKS = 40
 
@@ -198,11 +202,13 @@ export function createScene(village: Village, seed = village.seed): Scene {
     bugs: [],
     drowsiness: 0,
     lamps: [],
+    hasRooster: false,
     rooster: { x: 0, targetX: 0, facingLeft: false, pose: 'stand', restUntil: 0, crowUntil: 0 },
     nextId: 1,
     rand: random(seed ^ 0x5eed),
   }
   syncScene(scene, village)
+  // A village that already keeps a rooster has it by the fire from the start.
   scene.rooster.x = scene.rooster.targetX = campX(scene) + 12
   return scene
 }
@@ -271,6 +277,14 @@ export function syncScene(scene: Scene, village: Village): void {
     .sort((a, b) => Math.abs(a.index - village.camp) - Math.abs(b.index - village.camp) || a.index - b.index)
     .flatMap(({ plot, index }) => (plot.kind === 'building' ? Array.from({ length: BUILDINGS[plot.building].housing }, () => index) : []))
   scene.lamps = lampsOf(village)
+  // The rooster comes once the village is a hamlet, wandering in from the edge of the clearing.
+  if (!scene.hasRooster && builtCount(village) >= ROOSTER_AFTER_BUILT) {
+    scene.hasRooster = true
+    if (scene.tick > 0) {
+      scene.rooster.x = campX(scene) + (scene.rand() < 0.5 ? -1 : 1) * 90
+      scene.rooster.targetX = campX(scene) + 12
+    }
+  }
   syncPopulation(scene, village)
   // The first villager keeps the camp; the others take the beds in turn.
   scene.walkers.forEach((w, i) => {
@@ -280,25 +294,9 @@ export function syncScene(scene: Scene, village: Village): void {
   })
 }
 
-/** Open, settled ground: where a lamp may stand beside it. */
-function isSettled(plot: Plot | undefined): boolean {
-  return plot !== undefined && (plot.kind === 'building' || plot.kind === 'grass' || plot.kind === 'farm' || plot.kind === 'camp')
-}
-
-/**
- * Where the street lamps stand: once the village is a hamlet, on every third
- * edge between two settled plots, and never squeezed between two buildings.
- */
+/** Where the street lamps the villagers have put up stand, by their x in world pixels. */
 export function lampsOf(village: Village): number[] {
-  if (builtCount(village) < 2) return []
-  const lamps: number[] = []
-  for (let i = 0; i + 1 < village.plots.length; i++) {
-    const [a, b] = [village.plots[i], village.plots[i + 1]]
-    if (!isSettled(a) || !isSettled(b) || (a!.kind === 'building' && b!.kind === 'building')) continue
-    if ((((i - village.camp) % 3) + 3) % 3 !== 1) continue
-    lamps.push((i + 1) * PLOT)
-  }
-  return lamps
+  return village.lamps.map(i => i * PLOT)
 }
 
 function syncPopulation(scene: Scene, village: Village): void {
@@ -399,7 +397,9 @@ function dropX(scene: Scene): number {
   return campX(scene) - 14 - Math.floor(scene.rand() * 4)
 }
 
-function restSpot(scene: Scene): number {
+/** Where a villager goes to rest: by its own home, or by the fire for the one who keeps the camp. */
+function restSpot(scene: Scene, walker?: Walker): number {
+  if (walker?.home !== undefined) return doorX(walker.home) + Math.round(scene.rand() * 16 - 8)
   return campX(scene) - 14 - Math.floor(scene.rand() * 4)
 }
 
@@ -474,7 +474,7 @@ function finish(scene: Scene, walker: Walker): void {
     w.caught = undefined
     w.step = 0
     w.phase = 'returning'
-    w.targetX = w.carry !== undefined ? dropX(scene) : restSpot(scene)
+    w.targetX = w.carry !== undefined ? dropX(scene) : restSpot(scene, w)
   }
 }
 
@@ -581,7 +581,7 @@ export function scoutReturns(scene: Scene, hasLoot: boolean): void {
   scout.phase = 'returning'
   scout.awayUntil = undefined
   scout.carry = hasLoot ? 'sack' : undefined
-  scout.targetX = hasLoot ? dropX(scene) : restSpot(scene)
+  scout.targetX = hasLoot ? dropX(scene) : restSpot(scene, scout)
 }
 
 /** Whether a scout is out on an errand. */
@@ -661,6 +661,7 @@ function stepBugs(scene: Scene): void {
  * night turns to day it crows.
  */
 function stepRooster(scene: Scene, isNight: boolean): void {
+  if (!scene.hasRooster) return
   const r = scene.rooster
   const tick = scene.tick
   if (scene.wasNight === true && !isNight) r.crowUntil = tick + CROW_TICKS
@@ -762,7 +763,7 @@ export function stepScene(scene: Scene, isNight: boolean): void {
             walker.helping = undefined
             walker.action = undefined
             walker.phase = 'returning'
-            walker.targetX = restSpot(scene)
+            walker.targetX = restSpot(scene, walker)
             break
           }
           // Out of step with the one it helps, so the blows alternate.
@@ -825,7 +826,7 @@ export function stepScene(scene: Scene, isNight: boolean): void {
         if (walker.awayUntil !== undefined && tick >= walker.awayUntil) {
           walker.phase = 'returning'
           walker.awayUntil = undefined
-          walker.targetX = restSpot(scene)
+          walker.targetX = restSpot(scene, walker)
         }
         break
       case 'returning':
@@ -874,9 +875,14 @@ export function stepScene(scene: Scene, isNight: boolean): void {
           walker.targetX = doorX(walker.home)
           break
         }
-        const spot = isNight ? 10 + scene.rand() * 6 : 6 + scene.rand() * 30
+        // By day each wanders about near its own home; the one who keeps the camp, and anyone up at night, near the fire.
         const side = scene.rand() < 0.5 ? -1 : 1
-        walker.targetX = Math.round(campX(scene) - 4 + side * spot)
+        if (!isNight && walker.home !== undefined) {
+          walker.targetX = Math.round(doorX(walker.home) + side * (2 + scene.rand() * 20))
+        } else {
+          const spot = isNight ? 10 + scene.rand() * 6 : 6 + scene.rand() * 30
+          walker.targetX = Math.round(campX(scene) - 4 + side * spot)
+        }
         walker.restUntil = tick + 30 + Math.floor(scene.rand() * 60)
         if (isNight) {
           walker.pose = 'sit'
@@ -903,7 +909,7 @@ export function isBusy(scene: Scene): boolean {
     scene.chips.length > 0 ||
     scene.bugs.length > 0 ||
     scene.walkers.some(w => w.startledAt !== undefined && scene.tick - w.startledAt < WAKE_TICKS) ||
-    scene.tick < scene.rooster.crowUntil ||
+    (scene.hasRooster && scene.tick < scene.rooster.crowUntil) ||
     scene.walkers.some(w => (w.phase !== 'idle' && w.phase !== 'inside' && w.phase !== 'away') || w.x !== w.targetX)
   )
 }
