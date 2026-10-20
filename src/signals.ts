@@ -35,8 +35,8 @@ export function signalsFor(tool: string, input: unknown, result: unknown): Signa
   if (EDIT_TOOLS.has(tool)) return ['edit']
   if (tool === 'Write') return [record.type === 'create' ? 'create' : 'edit']
   if (READ_TOOLS.has(tool)) return ['read']
-  // Handing work to a subagent is planning, and counts as thinking.
-  if (tool === 'Agent' || tool === 'Task') return ['think']
+  // Handing work to a subagent is planning, and counts as thinking; the errand's scout brings back its finds.
+  if (tool === 'Agent' || tool === 'Task') return ['think', 'scout']
 
   if (tool === 'Bash') {
     if (record.interrupted === true || record.backgroundTaskId !== undefined) return []

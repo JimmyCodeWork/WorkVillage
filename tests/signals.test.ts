@@ -53,7 +53,7 @@ describe('signals', () => {
   })
 
   test('thinking and planning', () => {
-    expect(signalsFor('Agent', {}, {})).toEqual(['think'])
+    expect(signalsFor('Agent', {}, {})).toEqual(['think', 'scout'])
     expect(hasThinking('response', [{ type: 'thinking', thinking: '…' }])).toBe(true)
     expect(hasThinking('response', [{ type: 'redacted_thinking' }])).toBe(true)
     expect(hasThinking('response', [{ type: 'text', text: 'hi' }])).toBe(false)

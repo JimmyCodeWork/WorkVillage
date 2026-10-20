@@ -56,6 +56,14 @@ quiet moments a villager goes fishing: the float bobs, something bites, and the 
 the catch, most often a fish, now and then something else. Work never waits on fishing; the line
 comes in when there is a job to do.
 
+Now and then something else happens in the village. A bug may crawl out of the forest and scuttle
+about until the villagers catch it. A villager may set out on an errand, walk out of sight and come
+back later with a sack of finds. After a long quiet the villagers go home for a nap, snoring over
+the roof, while the one who keeps the camp dozes by the fire, until work wakes the village.
+
+The village keeps a rooster. It scratches about the camp by day, pecking at the ground, dozes when
+the village does, sleeps by the fire at night, and crows when night turns to day.
+
 The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
 and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves
 in autumn, and snow on the roofs and smoke from the chimneys in winter. The season is shown in the
@@ -69,8 +77,8 @@ Failed tool calls never cost you anything: the village only ever grows.
 
 ### Every village is its own
 
-Each village grows a forest of its own and has a colour of its own, which about half its buildings
-are raised in. Every building is given its look when it is placed: the colour of its roof, which
+Each village grows a forest of its own, with shrubs, weeds and small flowers on its open ground,
+and has a colour of its own, which about half its buildings are raised in. Every building is given its look when it is placed: the colour of its roof, which
 way it faces, and something set down beside it, such as barrels, crates or a woodpile. New
 buildings go up on either side of the camp, so no two villages are laid out alike.
 

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.1 - 2026-10-20
+
+- Events: now and then something happens in the village on its own.
+  - A bug may crawl out of the forest and scuttle about until the villagers catch it, which brings a
+    little knowledge. Nothing is ever lost to a bug.
+  - A villager may set out on an errand, walk out of sight and come back later with a sack of timber
+    and stone, or empty-handed if the errand came to nothing.
+  - After a long quiet the villagers go home for a nap, with a Z drifting up over the roof, while
+    the one who keeps the camp dozes by the fire. The next work wakes the village: the nappers come
+    out and everyone springs up. After dark they sleep on.
+- Open ground grows low shrubs (one with berries), short weeds and small flowers in five colours,
+  picked by where they grow, and wisps of weed and the odd flower dot the grass between trees and
+  rocks. Flowers are plentiful in spring and few in autumn, shrubs turn with the seasons like the
+  trees, and in winter only the snow-capped shrubs show.
+- The village keeps a rooster. It scratches about the camp by day, pecking at the ground, dozes when
+  the village does, sleeps by the fire at night, and crows when night turns to day.
+
 ## 0.3.0 - 2026-10-20
 
 - Villagers see each job through. Felling a tree takes many blows, with chips of wood flying, then

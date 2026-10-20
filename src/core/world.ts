@@ -66,7 +66,10 @@ export type Village = {
   kit: Kit
 }
 
-export type Signal = 'edit' | 'create' | 'read' | 'think' | 'test' | 'commit' | 'task' | 'turn'
+export type Signal = 'edit' | 'create' | 'read' | 'think' | 'test' | 'commit' | 'task' | 'turn' | 'bug' | 'scout'
+
+/** Signals that reward work already counted, or waiting; they do not move the seasons. */
+const UNCOUNTED: readonly Signal[] = ['turn', 'bug', 'scout']
 
 export type ActionKind =
   | 'chop'
@@ -484,6 +487,14 @@ export function applySignal(village: Village, signal: Signal): Outcome {
           : { village: gain(v, { food: 2 }), milestones }
       break
     }
+    case 'bug':
+      // A bug from a failed test, caught now the tests pass.
+      outcome = { village: gain(village, { knowledge: REWARDS.bugKnowledge }), milestones }
+      break
+    case 'scout':
+      // A scout back from a subagent's errand with what it found.
+      outcome = { village: gain(village, { wood: REWARDS.scoutWood, stone: REWARDS.scoutStone }), milestones }
+      break
     case 'turn': {
       // Claude has answered and waits: a villager goes fishing until there is work again.
       const v = count(village, 'turns')
@@ -497,7 +508,7 @@ export function applySignal(village: Village, signal: Signal): Outcome {
   }
 
   let v = outcome.village
-  if (signal !== 'turn') {
+  if (!UNCOUNTED.includes(signal)) {
     v = { ...v, stats: { ...v.stats, actions: v.stats.actions + 1 } }
     if (v.stats.actions % REWARDS.actionsPerArrival === 0) {
       const grown = arrival(v, milestones)

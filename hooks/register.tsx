@@ -35,9 +35,21 @@ import { resolveLocale, translator, type MessageKey, type Translate } from '../s
 import { toRasterCells, toRgba, toSvg } from '../src/pixel/encode'
 import { MONO_INK, type Palette } from '../src/pixel/filter'
 import { FINE_SMALL_HEIGHT, renderFrame, SCENE_HEIGHTS, type SceneSize } from '../src/scene/render'
-import { createScene, enqueue, isBusy, stepScene, syncScene, type Scene } from '../src/scene/sim'
+import {
+  catchBugs,
+  createScene,
+  enqueue,
+  isBusy,
+  releaseBug,
+  scoutReturns,
+  sendScout,
+  setDozing,
+  stepScene,
+  syncScene,
+  type Scene,
+} from '../src/scene/sim'
 import { SETTINGS, settingValue, type SettingField } from '../src/settings'
-import { hasThinking, signalsFor } from '../src/signals'
+import { hasThinking, isTestCommand, signalsFor } from '../src/signals'
 
 const PANE = 'workvillage'
 const SETTINGS_PANE = 'workvillage-settings'
@@ -50,6 +62,8 @@ const MAX_RASTER_COLUMNS = 512
 const MAX_IMAGE_COLUMNS = 255
 /** Widest vector scene, in scene pixels; past it the scene is centred. */
 const MAX_VECTOR_WIDTH = 640
+/** Quiet this long, and the villagers doze off where they rest. */
+const DOZE_MS = 3 * 60_000
 /** Roughly how many CSS pixels one column of a vector surface is. */
 const VECTOR_CELL_PX = 8
 
@@ -146,6 +160,8 @@ type Runtime = {
   isPointerOnSettings: boolean
   /** Surfaces where the Settings button's Client failed; a plain Button stands in. */
   clientFaults: Set<string>
+  /** When anything last happened in the session, for dozing. */
+  lastActivity: number
 }
 
 // The module's own state: rebuilt from $.store at each session.start, so a
@@ -172,6 +188,7 @@ const rt: Runtime = {
   isSettingsOpen: false,
   isPointerOnSettings: false,
   clientFaults: new Set(),
+  lastActivity: Date.now(),
 }
 
 function summary(): string {
@@ -323,9 +340,16 @@ function adopt(village: Village): void {
   rt.scene = createScene(village)
 }
 
+/** Something happened: the village wakes if it was dozing. */
+function stir(): void {
+  rt.lastActivity = Date.now()
+  setDozing(rt.scene, false)
+}
+
 async function apply($: EngineInterface, signals: readonly Signal[]): Promise<void> {
   if (signals.length === 0) return
   await ensureStarted($)
+  stir()
   for (const signal of signals) {
     const outcome = applySignal(rt.village, signal)
     rt.village = outcome.village
@@ -365,6 +389,7 @@ function rasterCells(canvas: ReturnType<typeof frame>): string {
 
 function tick($: EngineInterface): void {
   const hour = localHour()
+  setDozing(rt.scene, Date.now() - rt.lastActivity > DOZE_MS)
   stepScene(rt.scene, isNightHour(hour))
   let hasVector = false
   for (const [requestId, mount] of rt.mounts) {
@@ -634,9 +659,29 @@ export const register: Register = (on, options) => {
   })
 
   on('tool.call', async ($, e, next) => {
+    const tool = String(e.tool)
+    // A subagent's errand: a scout sets out now and comes back when it is done.
+    const isErrand = tool === 'Agent' || tool === 'Task'
+    if (isErrand) {
+      await ensureStarted($)
+      stir()
+      sendScout(rt.scene)
+    }
     const ran = await next(e)
-    if (ran.deny === undefined && ran.isError !== true) {
-      await apply($, signalsFor(String(e.tool), e, ran.result))
+    const isDone = ran.deny === undefined && ran.isError !== true
+    if (isErrand) scoutReturns(rt.scene, isDone)
+    if (isDone) {
+      const signals = signalsFor(tool, e, ran.result)
+      // Passing tests again: the bugs the failures let loose are caught.
+      if (signals.includes('test') && rt.isReady) {
+        for (let caught = catchBugs(rt.scene); caught > 0; caught--) signals.push('bug')
+      }
+      await apply($, signals)
+    } else if (ran.deny === undefined && tool === 'Bash' && isTestCommand(String((e as { command?: unknown }).command ?? ''))) {
+      // A failed test run costs nothing; a bug crawls out of the forest to be caught later.
+      await ensureStarted($)
+      stir()
+      releaseBug(rt.scene)
     }
     return ran
   }).catch(($, e, next) => next(e))

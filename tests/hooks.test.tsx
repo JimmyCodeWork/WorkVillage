@@ -458,3 +458,43 @@ test('work that finds a new style says so', async ($, on) => {
   expect(stats).toMatch(/Styles found 1\/8: Lanterns · 7 still to find\./)
   expect(stats).not.toMatch(/Slate/)
 })
+
+test('a failed test run lets a bug loose, caught for knowledge once the tests pass; a subagent sends a scout', async ($, on) => {
+  mock.clock(on, { now: 0 })
+  mock.store(on)
+  mock.env(on, { LANG: 'en_US.UTF-8' })
+  on('session.root', () => ({ value: '/work/events' }))
+  on('command.register', () => ({ value: { command: 'village' } }))
+  on('session.start', (_$, e) => e)
+  on('ui.toast', () => ({ value: undefined }))
+  const copied: string[] = []
+  on('ui.copy', (_$, e) => {
+    copied.push(e.text)
+    return { value: { isCopied: true } }
+  })
+  let failing = true
+  on('tool.call', (_$, e) => {
+    if (String(e.tool) === 'Bash' && failing) return { isError: true, text: '1 failed', result: { stdout: '', stderr: '1 failed', interrupted: false } } as never
+    return { result: { stdout: '', stderr: '', interrupted: false } as never }
+  })
+  const knowledge = async () => {
+    const panel = await $.ui.mount({ plugin: 'workvillage', surface: 'terminal', ...SETTINGS_PANE })
+    await panel.press({ key: 'export-village' })
+    await panel.unmount()
+    const read = decodeArchive(copied.at(-1)!)
+    return 'archive' in read && read.archive.kind === 'village' ? read.archive.village.resources : undefined
+  }
+
+  await $.session.start({ cwd: '/work/events', surface: 'terminal', isInteractive: true })
+  await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
+  const before = await knowledge()
+  // The failure itself costs nothing.
+  expect(before).toEqual({ wood: 0, stone: 0, food: 0, knowledge: 0 })
+  failing = false
+  await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
+  expect((await knowledge())?.knowledge).toBe(2)
+
+  const timber = (await knowledge())!.wood
+  await $.tool.call({ tool: 'Agent', prompt: 'look around', description: 'explore' } as never)
+  expect((await knowledge())?.wood).toBe(timber + 2)
+})

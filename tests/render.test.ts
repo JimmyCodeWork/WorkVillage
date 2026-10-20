@@ -4,7 +4,7 @@ import { applySignal, createVillage } from '../src/core/world'
 import { toBase64, toRasterCells, toSvg } from '../src/pixel/encode'
 import { MONO_INK, MONO_PAPER } from '../src/pixel/filter'
 import { renderFrame, SCENE_HEIGHTS } from '../src/scene/render'
-import { createScene, enqueue, stepScene, syncScene } from '../src/scene/sim'
+import { catchBugs, createScene, CROW_TICKS, enqueue, MAX_BUGS, releaseBug, scoutReturns, sendScout, setDozing, stepScene, syncScene } from '../src/scene/sim'
 
 describe('render', () => {
   test('base64 matches the standard alphabet and padding', () => {
@@ -269,5 +269,181 @@ describe('fishing', () => {
     syncScene(scene, v)
     stepScene(scene, false)
     expect(scene.walkers[0]!.action?.kind).toBe(work.action!.kind)
+  })
+})
+
+describe('events', () => {
+  const village = (villagers: number) => ({ ...createVillage(8, 0), villagers })
+  const run = (scene: ReturnType<typeof createScene>, ticks: number) => {
+    for (let i = 0; i < ticks; i++) stepScene(scene, false)
+  }
+
+  test('failed test runs let bugs loose, never more than a few', () => {
+    const scene = createScene(village(2))
+    for (let i = 0; i < 5; i++) releaseBug(scene)
+    expect(scene.bugs.length).toBe(MAX_BUGS)
+    run(scene, 300)
+    // They crawl about near the camp, waiting to be caught.
+    for (const bug of scene.bugs) expect(Math.abs(bug.x - (scene.camp * 12 + 6))).toBeLessThanOrEqual(72)
+  })
+
+  test('passing tests again: every bug is caught', () => {
+    const scene = createScene(village(2))
+    releaseBug(scene)
+    releaseBug(scene)
+    run(scene, 20)
+    expect(catchBugs(scene)).toBe(2)
+    expect(catchBugs(scene)).toBe(0)
+    let pounced = false
+    for (let i = 0; i < 400 && scene.bugs.length > 0; i++) {
+      stepScene(scene, false)
+      pounced ||= scene.walkers.some(w => w.phase === 'working' && w.action?.kind === 'catch' && w.pose === 'kneel')
+    }
+    expect(pounced).toBe(true)
+    expect(scene.bugs.length).toBe(0)
+  })
+
+  test('a scout goes out of sight on an errand and comes back with a sack', () => {
+    const scene = createScene(village(3))
+    run(scene, 10)
+    sendScout(scene)
+    // The one who keeps the camp never goes.
+    expect(scene.walkers[0]!.phase).not.toBe('scouting')
+    const scout = scene.walkers.find(w => w.phase === 'scouting')!
+    run(scene, 300)
+    expect(scout.phase).toBe('away')
+    scoutReturns(scene, true)
+    expect(scout.carry).toBe('sack')
+    run(scene, 400)
+    expect(scout.phase).toBe('idle')
+    expect(scout.carry).toBeUndefined()
+  })
+
+  test('an errand that fails brings the scout back empty-handed; a lone villager stays put', () => {
+    const scene = createScene(village(2))
+    sendScout(scene)
+    const scout = scene.walkers.find(w => w.phase === 'scouting')!
+    scoutReturns(scene, false)
+    expect(scout.phase).toBe('returning')
+    expect(scout.carry).toBeUndefined()
+    const alone = createScene(village(1))
+    sendScout(alone)
+    expect(alone.walkers[0]!.phase).not.toBe('scouting')
+  })
+
+  test('in a long quiet those with a home go in to nap, and come out when work wakes the village', () => {
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 150; i++) v = applySignal(v, signals[i % signals.length]!).village
+    const scene = createScene(v)
+    run(scene, 100)
+    setDozing(scene, true)
+    run(scene, 400)
+    // The one who keeps the camp dozes by the fire; everyone else is home asleep.
+    expect(scene.walkers[0]!.phase).toBe('idle')
+    expect(scene.walkers[0]!.pose).toBe('sit')
+    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
+    // A nap is not a short visit: it lasts as long as the quiet does.
+    run(scene, 400)
+    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
+    setDozing(scene, false)
+    run(scene, 2)
+    expect(scene.walkers.filter(w => w.phase === 'inside').length).toBe(0)
+  })
+
+  test('woken after dark, the nappers sleep on', () => {
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 150; i++) v = applySignal(v, signals[i % signals.length]!).village
+    const scene = createScene(v)
+    setDozing(scene, true)
+    for (let i = 0; i < 400; i++) stepScene(scene, true)
+    setDozing(scene, false)
+    for (let i = 0; i < 20; i++) stepScene(scene, true)
+    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
+  })
+
+  test('a long quiet sets the village dozing; work wakes it with a start', () => {
+    const scene = createScene(village(3))
+    run(scene, 200)
+    setDozing(scene, true)
+    run(scene, 200)
+    const resting = scene.walkers.filter(w => w.phase === 'idle' && w.x === w.targetX)
+    expect(resting.length).toBeGreaterThan(0)
+    expect(resting.every(w => w.pose === 'sit')).toBe(true)
+    setDozing(scene, false)
+    expect(scene.wokeAt).toBe(scene.tick)
+    run(scene, 1)
+    expect(scene.walkers.some(w => w.hop !== 0)).toBe(true)
+  })
+})
+
+describe('the rooster', () => {
+  const step = (scene: ReturnType<typeof createScene>, ticks: number, isNight: boolean) => {
+    for (let i = 0; i < ticks; i++) stepScene(scene, isNight)
+  }
+
+  test('by day it scratches about near the camp, pecking now and then', () => {
+    const scene = createScene(createVillage(8, 0))
+    const camp = scene.camp * 12 + 6
+    const poses = new Set<string>()
+    for (let i = 0; i < 600; i++) {
+      stepScene(scene, false)
+      poses.add(scene.rooster.pose)
+      expect(Math.abs(scene.rooster.x - camp)).toBeLessThanOrEqual(42)
+    }
+    expect([...poses]).toEqual(expect.arrayContaining(['walk1', 'peck']))
+    expect(poses.has('crow')).toBe(false)
+  })
+
+  test('it sleeps by the fire at night and in a long quiet', () => {
+    const night = createScene(createVillage(8, 0))
+    step(night, 200, true)
+    expect(night.rooster.pose).toBe('sit')
+    const quiet = createScene(createVillage(8, 0))
+    step(quiet, 20, false)
+    setDozing(quiet, true)
+    step(quiet, 200, false)
+    expect(quiet.rooster.pose).toBe('sit')
+  })
+
+  test('it crows when night turns to day, and not when the village wakes from a doze', () => {
+    const scene = createScene(createVillage(8, 0))
+    step(scene, 50, false)
+    setDozing(scene, true)
+    step(scene, 50, false)
+    setDozing(scene, false)
+    step(scene, 10, false)
+    expect(scene.tick).toBeGreaterThan(scene.rooster.crowUntil)
+    step(scene, 50, true)
+    step(scene, 1, false)
+    expect(scene.rooster.crowUntil).toBe(scene.tick + CROW_TICKS)
+    expect(['crow', 'stand']).toContain(scene.rooster.pose)
+  })
+})
+
+describe('meadows', () => {
+  const meadow = (season: number) => {
+    const v = createVillage(4, 0)
+    const plots = v.plots.map(p => (p.kind === 'camp' ? p : ({ kind: 'grass' } as const)))
+    const open = { ...v, plots, stats: { ...v.stats, actions: season * 40 } }
+    const scene = createScene(open)
+    scene.walkers = []
+    return new Set(renderFrame(open, scene, 160, { hour: 12 }, { height: 20 }).pixels)
+  }
+  const PINK = 0xf4a6c0
+  const BLUE = 0x7fa7e0
+
+  test('open ground grows shrubs, weeds and flowers of several colours', () => {
+    const colors = meadow(0)
+    expect([PINK, BLUE, 0xe2bd4f, 0xc9442c].filter(c => colors.has(c)).length).toBeGreaterThanOrEqual(2)
+    // Weeds in their own bright green, which no tree uses.
+    expect(colors.has(0x8fd16a)).toBe(true)
+  })
+
+  test('in winter the flowers are gone under the snow', () => {
+    const colors = meadow(3)
+    expect(colors.has(PINK)).toBe(false)
+    expect(colors.has(BLUE)).toBe(false)
   })
 })

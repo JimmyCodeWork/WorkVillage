@@ -27,6 +27,7 @@ export type Pose =
   | 'rodOut'
   | 'rodPull'
   | 'holdUp'
+  | 'carrySack'
 
 /** Width of the box the villager is drawn in; the body sits in its middle. */
 export const VILLAGER_WIDTH = 9
@@ -82,6 +83,8 @@ const ARMS: Record<Pose, readonly Px[]> = {
   rodPull: [[6, 4, P.skin], [7, 3, P.woodDark], [7, 2, P.woodDark], [8, 1, P.woodDark], [8, 0, P.woodDark]],
   // Both hands up, holding what came out of the water over the head.
   holdUp: [[6, 4, P.skin], [6, 3, P.skin], [2, 4, P.skin], [2, 3, P.skin]],
+  // A full sack over the shoulder, back from a scout's errand.
+  carrySack: [[5, 4, P.skin], [1, 2, P.thatch], [2, 2, P.thatch], [1, 3, P.thatchDark], [2, 3, P.thatch], [3, 3, P.thatchDark], [2, 4, P.thatchDark]],
 }
 
 /** Where the tip of the rod is in a pose, facing right, for drawing the line. */
@@ -91,7 +94,7 @@ export const ROD_TIP: Partial<Record<Pose, readonly [x: number, y: number]>> = {
 }
 
 function legsFor(pose: Pose): readonly Px[] {
-  if (pose === 'walk1' || pose === 'carryLog' || pose === 'carryStone') return LEGS.walk1
+  if (pose === 'walk1' || pose === 'carryLog' || pose === 'carryStone' || pose === 'carrySack') return LEGS.walk1
   if (pose === 'walk2') return LEGS.walk2
   if (pose === 'kneel' || pose === 'water1' || pose === 'water2') return LEGS.kneel
   if (pose === 'sit' || pose === 'read') return LEGS.sit

@@ -300,5 +300,29 @@ export const CAUGHT_FISH = s(['.QQq.', 'QQQQq', '.QQq.'])
 export const CAUGHT_BOOT = s(['dd.', 'dd.', 'ddd'])
 export const CAUGHT_CHEST = s(['wWWw', 'dzzd', 'dddd'])
 
-export const FLOWER = s(['z', 'e'])
-export const TUFT = s(['m.m', '.m.'])
+/** The village rooster, facing right: walking, pecking, sitting and crowing at dawn. Red comb and wattle, yellow legs. */
+export const ROOSTER: Readonly<Record<'walk1' | 'walk2' | 'stand' | 'peck' | 'sit' | 'crow', Sprite>> = {
+  stand: s(['...j.', 'u..uF', 'uuuuj', '.uuu.', '.z.z.']),
+  walk1: s(['...j.', 'u..uF', 'uuuuj', '.uuu.', 'z...z']),
+  walk2: s(['...j.', 'u..uF', 'uuuuj', '.uuu.', '..z..']),
+  peck: s(['.....', 'u....', 'uuuj.', '.uuuu', '.z.zF']),
+  sit: s(['...j.', 'u..uF', 'uuuuj', '.uuu.']),
+  crow: s(['....j', 'u..uF', 'u.uuj', 'uuuu.', '.uuu.', '.z.z.']),
+}
+
+/** Low shrubs on open ground; their leaves turn with the seasons like the trees'. One bears berries. */
+export const BUSHES: readonly Sprite[] = [
+  s(['.mlm.', 'mlllL', 'lLLLL']),
+  s(['.ml.', 'lllL']),
+  s(['.mjm.', 'mlllj', 'lLLLL']),
+]
+
+/** Short weeds and grass, a few pixels high. */
+export const WEEDS: readonly Sprite[] = [
+  s(['m.m', '.m.']),
+  s(['e..', 'e.e', '.ee']),
+  s(['.m', 'mm']),
+]
+
+/** Small flowers, drawn in yellow and given their own colour when drawn: one alone, or a pair. */
+export const FLOWERS: readonly Sprite[] = [s(['z', 'e']), s(['z.z', 'e.e']), s(['.z', 'ze', 'e.'])]
