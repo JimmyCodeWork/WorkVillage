@@ -10,6 +10,10 @@
   - After a long quiet the villagers go home for a nap, with a Z drifting up over the roof, while
     the one who keeps the camp dozes by the fire. The next work wakes the village: the nappers come
     out and everyone springs up. After dark they sleep on.
+- Open ground grows low shrubs (one with berries), short weeds and small flowers in five colours,
+  picked by where they grow, and wisps of weed and the odd flower dot the grass between trees and
+  rocks. Flowers are plentiful in spring and few in autumn, shrubs turn with the seasons like the
+  trees, and in winter only the snow-capped shrubs show.
 - The village keeps a rooster. It scratches about the camp by day, pecking at the ground, dozes when
   the village does, sleeps by the fire at night, and crows when night turns to day.
 

@@ -310,5 +310,19 @@ export const ROOSTER: Readonly<Record<'walk1' | 'walk2' | 'stand' | 'peck' | 'si
   crow: s(['....j', 'u..uF', 'u.uuj', 'uuuu.', '.uuu.', '.z.z.']),
 }
 
-export const FLOWER = s(['z', 'e'])
-export const TUFT = s(['m.m', '.m.'])
+/** Low shrubs on open ground; their leaves turn with the seasons like the trees'. One bears berries. */
+export const BUSHES: readonly Sprite[] = [
+  s(['.mlm.', 'mlllL', 'lLLLL']),
+  s(['.ml.', 'lllL']),
+  s(['.mjm.', 'mlllj', 'lLLLL']),
+]
+
+/** Short weeds and grass, a few pixels high. */
+export const WEEDS: readonly Sprite[] = [
+  s(['m.m', '.m.']),
+  s(['e..', 'e.e', '.ee']),
+  s(['.m', 'mm']),
+]
+
+/** Small flowers, drawn in yellow and given their own colour when drawn: one alone, or a pair. */
+export const FLOWERS: readonly Sprite[] = [s(['z', 'e']), s(['z.z', 'e.e']), s(['.z', 'ze', 'e.'])]

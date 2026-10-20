@@ -421,3 +421,29 @@ describe('the rooster', () => {
     expect(['crow', 'stand']).toContain(scene.rooster.pose)
   })
 })
+
+describe('meadows', () => {
+  const meadow = (season: number) => {
+    const v = createVillage(4, 0)
+    const plots = v.plots.map(p => (p.kind === 'camp' ? p : ({ kind: 'grass' } as const)))
+    const open = { ...v, plots, stats: { ...v.stats, actions: season * 40 } }
+    const scene = createScene(open)
+    scene.walkers = []
+    return new Set(renderFrame(open, scene, 160, { hour: 12 }, { height: 20 }).pixels)
+  }
+  const PINK = 0xf4a6c0
+  const BLUE = 0x7fa7e0
+
+  test('open ground grows shrubs, weeds and flowers of several colours', () => {
+    const colors = meadow(0)
+    expect([PINK, BLUE, 0xe2bd4f, 0xc9442c].filter(c => colors.has(c)).length).toBeGreaterThanOrEqual(2)
+    // Weeds in their own bright green, which no tree uses.
+    expect(colors.has(0x8fd16a)).toBe(true)
+  })
+
+  test('in winter the flowers are gone under the snow', () => {
+    const colors = meadow(3)
+    expect(colors.has(PINK)).toBe(false)
+    expect(colors.has(BLUE)).toBe(false)
+  })
+})

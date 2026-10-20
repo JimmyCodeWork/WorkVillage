@@ -77,8 +77,8 @@ Failed tool calls never cost you anything: the village only ever grows.
 
 ### Every village is its own
 
-Each village grows a forest of its own and has a colour of its own, which about half its buildings
-are raised in. Every building is given its look when it is placed: the colour of its roof, which
+Each village grows a forest of its own, with shrubs, weeds and small flowers on its open ground,
+and has a colour of its own, which about half its buildings are raised in. Every building is given its look when it is placed: the colour of its roof, which
 way it faces, and something set down beside it, such as barrels, crates or a woodpile. New
 buildings go up on either side of the camp, so no two villages are laid out alike.
 

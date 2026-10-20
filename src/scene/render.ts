@@ -2,6 +2,9 @@
 
 import { P, ROOF_COLORS, SEASON_DRIFT, SEASON_LEAVES, seasonSky, skyFor, type Sky } from '../art/palette'
 import {
+  BUSHES,
+  FLOWERS,
+  WEEDS,
   ROOSTER,
   CAUGHT_BOOT,
   CAUGHT_CHEST,
@@ -18,7 +21,6 @@ import {
   CROPS,
   EMBERS,
   FARM_SOIL,
-  FLOWER,
   HOUSE,
   HUT,
   LOG,
@@ -29,7 +31,6 @@ import {
   TENT,
   TOWER,
   TREES,
-  TUFT,
   WELL,
   WORKSHOP,
 } from '../art/sprites'
@@ -189,10 +190,7 @@ function drawPlot(
       if (isWinter) drawSnowCap(canvas, STUMP, centered(STUMP), bottomY(canvas, STUMP), false)
       break
     case 'grass':
-      // Tufts and flowers lie under the snow in winter.
-      if (isWinter) break
-      if (hash01(seed + 9, index) < 0.6) drawSprite(canvas, TUFT, x0 + 2 + Math.floor(hash01(seed, index) * 6), GROUND - 1)
-      if (hash01(seed + 10, index) < 0.5) drawSprite(canvas, FLOWER, x0 + 1 + Math.floor(hash01(seed + 11, index) * 9), GROUND - 1)
+      drawMeadow(canvas, x0, seed, index, season)
       break
     case 'farm': {
       drawSprite(canvas, FARM_SOIL, x0 + 1, GROUND)
@@ -366,6 +364,65 @@ function drawRooster(canvas: Canvas, r: Rooster, camera: number, tick: number, i
     setPixel(canvas, beak + out, y + 2, P.white)
   }
   if (isAsleep && r.pose === 'sit') drawZ(canvas, x + 2, y - 1, tick, 7)
+}
+
+/** Petal colours a flower may be drawn in, chosen by where it grows. */
+const PETALS: readonly number[] = [P.grain, P.white, 0xf4a6c0, 0x7fa7e0, P.ember]
+
+/** How likely a flower is in each season: plenty in spring, a few in autumn, none under snow. */
+const BLOOM: Readonly<Record<Season, number>> = { spring: 0.8, summer: 0.6, autumn: 0.25, winter: 0 }
+
+function drawFlower(canvas: Canvas, x: number, seed: number, n: number): void {
+  const art = FLOWERS[Math.floor(hash01(seed + 71, n) * FLOWERS.length)]!
+  const petal = PETALS[Math.floor(hash01(seed + 72, n) * PETALS.length)]!
+  drawSprite(canvas, art, x, groundOf(canvas) - art.height, { recolor: new Map([[P.grain, petal]]) })
+}
+
+/**
+ * Open ground: one to three of a shrub, a clump of weeds and small flowers,
+ * picked by where it lies so each village's meadows are its own. Weeds and
+ * flowers lie under the snow in winter; shrubs turn with the seasons.
+ */
+function drawMeadow(canvas: Canvas, x0: number, seed: number, index: number, season: Season): void {
+  const GROUND = groundOf(canvas)
+  const count = 1 + Math.floor(hash01(seed + 73, index) * 3)
+  for (let k = 0; k < count; k++) {
+    const n = index * 7 + k
+    const x = x0 + 1 + Math.floor(hash01(seed + 74, n) * (PLOT - 4))
+    const roll = hash01(seed + 75, n)
+    if (roll < 0.25) {
+      const art = BUSHES[Math.floor(hash01(seed + 76, n) * BUSHES.length)]!
+      const y = GROUND + 1 - art.height
+      drawSprite(canvas, art, Math.min(x, x0 + PLOT - art.width), y, { recolor: SEASON_LEAVES[season] })
+      if (season === 'winter') drawSnowCap(canvas, art, Math.min(x, x0 + PLOT - art.width), y, false)
+    } else if (season === 'winter') {
+      continue
+    } else if (roll < 0.6) {
+      const art = WEEDS[Math.floor(hash01(seed + 77, n) * WEEDS.length)]!
+      drawSprite(canvas, art, x, GROUND - art.height)
+    } else if (hash01(seed + 78, n) < BLOOM[season]) {
+      drawFlower(canvas, x, seed, n)
+    }
+  }
+}
+
+/**
+ * Wisps of weed and the odd flower along the grass between everything else,
+ * so the ground between trees and rocks is never bare. Drawn under the plots.
+ */
+function drawGroundCover(canvas: Canvas, seed: number, camera: number, season: Season): void {
+  if (season === 'winter') return
+  const GROUND = groundOf(canvas)
+  for (let x = 0; x < canvas.width; x++) {
+    const wx = x + camera
+    const roll = hash01(seed + 81, wx)
+    if (roll < 0.05) {
+      setPixel(canvas, x, GROUND - 1, hash01(seed + 82, wx) < 0.5 ? P.leafLight : P.sprout)
+    } else if (roll < 0.062 && hash01(seed + 83, wx) < BLOOM[season]) {
+      setPixel(canvas, x, GROUND - 1, P.crop)
+      setPixel(canvas, x, GROUND - 2, PETALS[Math.floor(hash01(seed + 84, wx) * PETALS.length)]!)
+    }
+  }
 }
 
 /** Snow on whatever is uppermost in each column of a sprite. */
@@ -543,6 +600,7 @@ export function renderFrame(
   drawHills(canvas, sky, camera)
   drawGround(canvas, sky, village.seed, camera)
   const background = canvas.pixels.slice()
+  drawGroundCover(canvas, village.seed, camera, season)
 
   const first = Math.floor(camera / PLOT) - 1
   const last = Math.ceil((camera + width) / PLOT) + 1
