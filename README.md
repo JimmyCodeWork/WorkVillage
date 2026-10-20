@@ -16,22 +16,62 @@ buildings. The camp becomes a hamlet, then a village, a town and eventually a ci
 
 ## Install
 
+### In the terminal
+
 At the prompt of a Claude Code terminal session:
 
 ```
 /plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 ```
 
-Answer `y` to add the marketplace, then choose a scope. From a shell:
+Answer `y` to add the marketplace, then choose a scope. Or, from a shell, without starting a session:
 
 ```
 claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 ```
 
-In the desktop app, click **+** next to the prompt box, then **Plugins**, **Add marketplace** with
-`JimmyCodeWork/WorkVillage`, then **Add plugin**.
+### In the desktop app
 
-Requires Claude Code 2.1.275 or later.
+The desktop app's local sessions read the same plugin settings as the terminal, so a plugin you
+install for your user account in one is available in the other.
+
+1. Add the WorkVillage marketplace once. If the plugin browser in step 2 doesn't list WorkVillage,
+   run this in a terminal:
+
+   ```
+   claude plugin marketplace add JimmyCodeWork/WorkVillage
+   ```
+
+2. In a local session on the **Code** tab, click **+** next to the prompt box and select
+   **Add plugins**. If the menu shows **Plugins** instead, select it, then **Browse plugins**.
+3. Select **workvillage** and choose a scope: your user account, this project, or local only.
+
+Installing from a terminal with the commands above, for your user account, works for the desktop
+app too. Plugins are not available in cloud sessions.
+
+### Updating
+
+WorkVillage comes from a third-party marketplace, so Claude Code doesn't update it on its own
+unless you turn that on. To update now, do one of these:
+
+- In a terminal session, run `/plugin`, open WorkVillage on the **Installed** tab and select
+  **Update now**.
+- From a shell, run:
+
+  ```
+  claude plugin update workvillage@workvillage
+  ```
+
+A session that is already open keeps the version it loaded. Run `/reload-plugins` there, or start a
+new session; in the desktop app, start a new session.
+
+To have WorkVillage update by itself, run `/plugin` in a terminal session, go to the
+**Marketplaces** tab, select **workvillage** and choose **Enable auto-update**. Updates then arrive
+when a session starts.
+
+### Requirements
+
+Claude Code 2.1.275 or later. Installing from a shell with `--marketplace` needs 2.1.292 or later.
 
 ## How your work shapes the village
 

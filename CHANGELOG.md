@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The README covers installing in the desktop app and keeping WorkVillage updated, including turning
+  on auto-update, and notes that installing from a shell with `--marketplace` needs Claude Code
+  2.1.292 or later.
+
 ## 0.3.1 - 2026-10-20
 
 - Events: now and then something happens in the village on its own.
