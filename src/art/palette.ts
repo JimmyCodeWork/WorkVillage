@@ -1,6 +1,10 @@
 // WorkVillage's own palette. Every sprite in this project is original work
 // drawn for WorkVillage and released under the project's licence.
 
+import type { RoofStyle } from '../core/balance'
+import type { Season } from '../core/world'
+import { mix } from '../pixel/canvas'
+
 export const P = {
   outline: 0x2a2433,
   skin: 0xe9b995,
@@ -50,6 +54,50 @@ export const P = {
   white: 0xf4f1e8,
   metal: 0xa9b0b8,
 } as const
+
+/**
+ * Each roof style as a recolouring of the art: tiles, thatch and tent canvas
+ * together, so one building reads as one style. `classic` keeps the art.
+ */
+export const ROOF_COLORS: Readonly<Record<RoofStyle, ReadonlyMap<number, number>>> = {
+  classic: new Map(),
+  blue: new Map([
+    [P.roof, 0x3f6f9e],
+    [P.roofDark, 0x2c4f73],
+    [P.canvas, 0xcfdcea],
+    [P.canvasShade, 0x9fb3c8],
+  ]),
+  slate: new Map([
+    [P.roof, 0x6b7280],
+    [P.roofDark, 0x4b5160],
+    [P.thatch, 0xc9b98a],
+    [P.thatchDark, 0x938456],
+    [P.canvas, 0xdcdcd6],
+    [P.canvasShade, 0xb0b0a8],
+  ]),
+  moss: new Map([
+    [P.roof, 0x5d8a4a],
+    [P.roofDark, 0x3f6234],
+    [P.thatch, 0xb9a95a],
+    [P.thatchDark, 0x857a3c],
+    [P.canvas, 0xd6e2c0],
+    [P.canvasShade, 0xa9b98f],
+  ]),
+  terracotta: new Map([
+    [P.roof, 0xc96a3a],
+    [P.roofDark, 0x96482a],
+    [P.thatch, 0xdba25a],
+    [P.thatchDark, 0xa9733a],
+    [P.canvas, 0xeed3b0],
+    [P.canvasShade, 0xc9a985],
+  ]),
+  plum: new Map([
+    [P.roof, 0x8a4f7a],
+    [P.roofDark, 0x613659],
+    [P.canvas, 0xe3d0e0],
+    [P.canvasShade, 0xbba2b8],
+  ]),
+}
 
 /** Tunic colours given to villagers in turn. */
 export const TUNICS: readonly number[] = [
@@ -129,3 +177,63 @@ export function skyFor(hour: number): Sky {
   if (hour >= 5 && hour < 7) return DAWN
   return NIGHT
 }
+
+const SNOW = 0xe9eff5
+const NIGHT_INK = 0x0d1328
+
+/**
+ * The season's turn on the ground and hills: lusher in summer, gold in
+ * autumn, under snow in winter. Colours put in whole are darkened by the
+ * hour as the sky's own are.
+ */
+export function seasonSky(sky: Sky, season: Season): Sky {
+  const byHour = (color: number): number => mix(color, NIGHT_INK, sky.dim)
+  switch (season) {
+    case 'spring':
+      return { ...sky, grassLight: mix(sky.grassLight, byHour(0xa8d86a), 0.4) }
+    case 'summer':
+      return { ...sky, grass: mix(sky.grass, byHour(0x3f7f2e), 0.4) }
+    case 'autumn':
+      return {
+        ...sky,
+        grass: mix(sky.grass, byHour(0xa8862e), 0.7),
+        grassLight: mix(sky.grassLight, byHour(0xd8a33a), 0.7),
+        hillFar: mix(sky.hillFar, byHour(0xc09a5a), 0.4),
+        hillNear: mix(sky.hillNear, byHour(0xb0803e), 0.4),
+      }
+    case 'winter':
+      return {
+        ...sky,
+        grass: byHour(SNOW),
+        grassLight: byHour(P.white),
+        hillFar: mix(sky.hillFar, byHour(SNOW), 0.8),
+        hillNear: mix(sky.hillNear, byHour(SNOW), 0.7),
+      }
+  }
+}
+
+/** Leaves through the year: blossom in spring, turning in autumn, snow-laden in winter. */
+export const SEASON_LEAVES: Readonly<Record<Season, ReadonlyMap<number, number>>> = {
+  spring: new Map([[P.leafLight, 0xf4c2d0]]),
+  summer: new Map(),
+  autumn: new Map([
+    [P.leafDark, 0x9a4a22],
+    [P.leaf, 0xd0782e],
+    [P.leafLight, 0xeec04a],
+  ]),
+  winter: new Map([
+    [P.leafDark, 0x9aa6b4],
+    [P.leaf, 0xcfd8e2],
+    [P.leafLight, P.white],
+    [P.pineLight, P.white],
+  ]),
+}
+
+/** What drifts through the air in each season, if anything. */
+export const SEASON_DRIFT: Readonly<Record<Season, number | undefined>> = {
+  spring: 0xf4c2d0,
+  summer: undefined,
+  autumn: 0xd0782e,
+  winter: P.white,
+}
+

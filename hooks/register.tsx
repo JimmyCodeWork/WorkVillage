@@ -1,18 +1,37 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderSurface } from 'claude-code'
 
+import type { WorkvillageTransfer } from '../types'
+import { decodeArchive, encodeArchive, type Archive } from '../src/core/archive'
 import { BUILD_ORDER, BUILDINGS } from '../src/core/balance'
 import {
+  foundStyles,
+  isVillageKey,
+  newlyFound,
+  profileFrom,
+  recordWork,
+  restoreProfile,
+  statsDelta,
+  villageKey,
+  VILLAGE_KEY_PREFIX,
+  type Profile,
+} from '../src/core/profile'
+import { UNLOCKS, type Unlock } from '../src/core/balance'
+import {
   applySignal,
+  builtCount,
   createVillage,
   isComplete,
   restore,
+  seasonOf,
   stageOf,
   type Milestone,
   type Signal,
+  type Stats,
   type Village,
+  withStyles,
 } from '../src/core/world'
-import { resolveLocale, translator, type Translate } from '../src/i18n/index'
+import { resolveLocale, translator, type MessageKey, type Translate } from '../src/i18n/index'
 import { toRasterCells, toRgba, toSvg } from '../src/pixel/encode'
 import { MONO_INK, type Palette } from '../src/pixel/filter'
 import { FINE_SMALL_HEIGHT, renderFrame, SCENE_HEIGHTS, type SceneSize } from '../src/scene/render'
@@ -53,6 +72,13 @@ const animationFrame = atom({ plugin: 'workvillage', key: 'frame' } as const, 0)
  */
 const chosenSettings = atom({ plugin: 'workvillage', key: 'chosen' } as const, {} as Record<string, string>)
 const revision = atom({ plugin: 'workvillage', key: 'revision' } as const, 0)
+const NO_TRANSFER: WorkvillageTransfer = { notice: '', values: {}, shown: '', pending: '' }
+const transfer = atom({ plugin: 'workvillage', key: 'transfer' } as const, NO_TRANSFER)
+
+/** The device-wide record, beside each project's `village:<root>`. */
+const PROFILE_KEY = 'profile'
+/** What the last import replaced, so it can be put back. */
+const BACKUP_KEY = 'backup'
 
 /**
  * How one site draws the scene: `raster` is half-block cells (two pixels a
@@ -95,6 +121,14 @@ type Runtime = {
   t: Translate
   storeKey: string
   village: Village
+  /** The village's counters as last added to the device-wide record. */
+  recorded: Stats
+  /** The save in flight; saves run one after another. */
+  saving: Promise<void>
+  /** The store holds what the last import replaced. */
+  canUndoImport: boolean
+  /** The device's lifetime counts as last read, for the collection line. */
+  lifetime: Stats
   scene: Scene
   isReady: boolean
   /** The start in flight, so a draw that comes first can wait for it. */
@@ -126,6 +160,10 @@ const rt: Runtime = {
   t: translator('en'),
   storeKey: '',
   village: createVillage(0, 0),
+  recorded: createVillage(0, 0).stats,
+  saving: Promise.resolve(),
+  canUndoImport: false,
+  lifetime: createVillage(0, 0).stats,
   scene: createScene(createVillage(0, 0)),
   isReady: false,
   mounts: new Map(),
@@ -140,6 +178,7 @@ function summary(): string {
   const r = rt.village.resources
   return rt.t('summary.line', {
     stage: rt.t(`stage.${stageOf(rt.village)}`),
+    season: rt.t(`season.${seasonOf(rt.village)}`),
     villagers: rt.village.villagers,
     wood: r.wood,
     stone: r.stone,
@@ -159,9 +198,8 @@ function progressLine(): string {
   return t('summary.next', { building: t(`building.${next}`), wood: cost.wood, stone: cost.stone })
 }
 
-function statsText(): string {
+function statsText(s: Stats = rt.village.stats): string {
   const { t } = rt
-  const s = rt.village.stats
   return [
     `${t('stat.edits')} ${s.edits}`,
     `${t('stat.reads')} ${s.reads}`,
@@ -190,13 +228,99 @@ function announce($: EngineInterface, milestone: Milestone): void {
   }
 }
 
-function scheduleSave($: EngineInterface): void {
-  rt.saveTimer?.cancel()
-  rt.saveTimer = $.clock.after(1500, () => saveNow($))
+/** Every project's work on this device, for `/village stats`. */
+function lifetimeText(profile: Profile): string {
+  return `${rt.t('stat.lifetime', { villages: Object.keys(profile.villages).length })} ${statsText(profile.lifetime)}`
 }
 
-function saveNow($: EngineInterface): void {
-  void $.store.set(rt.storeKey, rt.village)
+async function storedVillages($: EngineInterface): Promise<Record<string, Village>> {
+  const villages: Record<string, Village> = {}
+  for (const key of await $.store.keys()) {
+    const village = isVillageKey(key) ? restore(await $.store.get(key)) : undefined
+    if (village) villages[key] = village
+  }
+  return villages
+}
+
+/** The device's record; one begun now starts from the villages already on the device. */
+async function readProfile($: EngineInterface): Promise<Profile> {
+  const stored = restoreProfile(await $.store.get(PROFILE_KEY))
+  return stored ?? profileFrom(Object.values(await storedVillages($)), await $.clock.now())
+}
+
+/** A fresh village for this project, with every style found so far. */
+async function freshVillage($: EngineInterface, seed: number): Promise<Village> {
+  rt.lifetime = (await readProfile($)).lifetime
+  return createVillage(seed, await $.clock.now(), foundStyles(rt.lifetime))
+}
+
+/** A village with every style found on this device added to its kit. */
+async function withFound($: EngineInterface, village: Village): Promise<Village> {
+  rt.lifetime = (await readProfile($)).lifetime
+  const styles = foundStyles(rt.lifetime)
+  return { ...village, kit: withStyles(village.kit, styles.roofs, styles.props) }
+}
+
+/**
+ * The styles found so far, by name. What is still to be found is only
+ * counted: how to find it is left for work to turn up, not to be chased.
+ */
+function collectionText(): string {
+  const found = UNLOCKS.filter(u => rt.lifetime[u.stat] >= u.at)
+  const names = found.map(styleName).join(rt.t('collection.separator'))
+  const left = UNLOCKS.length - found.length
+  return [
+    rt.t('collection.title', { found: found.length, total: UNLOCKS.length }),
+    found.length > 0 ? names : rt.t('collection.none'),
+    left > 0 ? rt.t('collection.left', { left }) : rt.t('collection.complete'),
+  ].join(' ')
+}
+
+function styleName(unlock: Unlock): string {
+  return unlock.kind === 'roof' ? rt.t(`style.roof.${unlock.style}`) : rt.t(`style.prop.${unlock.style}`)
+}
+
+function scheduleSave($: EngineInterface): void {
+  rt.saveTimer?.cancel()
+  rt.saveTimer = $.clock.after(1500, () => void saveNow($))
+}
+
+/**
+ * Saves the village, then adds its work since the last save to the device's
+ * record. The record is read fresh each time, so sessions in other terminals
+ * add to it too rather than overwrite it.
+ */
+function saveNow($: EngineInterface): Promise<void> {
+  rt.saveTimer?.cancel()
+  rt.saving = rt.saving
+    .then(async () => {
+      const village = rt.village
+      // Read first: a record begun now counts the villages as stored before this save.
+      const profile = await readProfile($)
+      await $.store.set(rt.storeKey, village)
+      const delta = statsDelta(rt.recorded, village.stats)
+      const next = recordWork(profile, rt.storeKey, village, delta, await $.clock.now())
+      await $.store.set(PROFILE_KEY, next)
+      rt.recorded = village.stats
+      rt.lifetime = next.lifetime
+      // Styles found by this work can turn up on this village's next buildings.
+      const found = newlyFound(profile.lifetime, next.lifetime)
+      if (found.length > 0) {
+        const styles = foundStyles(next.lifetime)
+        rt.village = { ...rt.village, kit: withStyles(rt.village.kit, styles.roofs, styles.props) }
+        await $.store.set(rt.storeKey, rt.village)
+        for (const unlock of found) $.ui.toast(rt.t('toast.found', { style: styleName(unlock) }))
+      }
+    })
+    .catch(() => undefined)
+  return rt.saving
+}
+
+/** Puts a village in place as this project's, without counting it as new work. */
+function adopt(village: Village): void {
+  rt.village = village
+  rt.recorded = village.stats
+  rt.scene = createScene(village)
 }
 
 async function apply($: EngineInterface, signals: readonly Signal[]): Promise<void> {
@@ -309,9 +433,10 @@ async function start($: EngineInterface): Promise<void> {
   configure({ ...rt.options, ...(await read($, chosenSettings)) })
   rt.hasGraphics = await detectGraphics($)
   const root = await $.session.root()
-  rt.storeKey = `village:${root}`
-  rt.village = restore(await $.store.get(rt.storeKey)) ?? createVillage(seedFrom(root), await $.clock.now())
-  rt.scene = createScene(rt.village)
+  rt.storeKey = villageKey(root)
+  const saved = restore(await $.store.get(rt.storeKey))
+  adopt(saved ? await withFound($, saved) : await freshVillage($, seedFrom(root)))
+  rt.canUndoImport = (await $.store.get(BACKUP_KEY)) !== undefined
   rt.isReady = true
   await $.command.register({
     name: 'village',
@@ -338,8 +463,7 @@ async function ensureStarted($: EngineInterface): Promise<void> {
 
 async function stop($: EngineInterface): Promise<void> {
   rt.ticker?.cancel()
-  rt.saveTimer?.cancel()
-  if (rt.isReady) await $.store.set(rt.storeKey, rt.village)
+  if (rt.isReady) await saveNow($)
 }
 
 async function openSettings($: EngineInterface): Promise<void> {
@@ -379,6 +503,89 @@ async function changeSetting($: EngineInterface, field: SettingField, value: str
   }
 }
 
+async function say($: EngineInterface, notice: MessageKey | '', values: Record<string, string | number> = {}, rest: Partial<WorkvillageTransfer> = {}): Promise<void> {
+  await update($, transfer, () => ({ ...NO_TRANSFER, notice, values, ...rest }))
+}
+
+/** This project's village, or a backup of every village and the record on this device. */
+async function makeArchive($: EngineInterface, kind: Archive['kind']): Promise<Archive> {
+  await saveNow($)
+  if (kind === 'village') return { kind, village: rt.village }
+  return { kind, profile: await readProfile($), villages: await storedVillages($) }
+}
+
+/** Copies an export code; where the clipboard does not take it, shows it to copy by hand. */
+async function exportCode($: EngineInterface, kind: Archive['kind'], surface: RenderSurface): Promise<void> {
+  const code = encodeArchive(await makeArchive($, kind))
+  const copied = await $.ui.copy({ text: code, surface }).catch(() => ({ isCopied: false as const }))
+  const what = rt.t(kind === 'village' ? 'data.what.village' : 'data.what.backup')
+  if (copied.isCopied) await say($, 'data.copied', { what })
+  else await say($, 'data.copyByHand', { what }, { shown: code })
+}
+
+function preview(archive: Archive): { notice: MessageKey; values: Record<string, string | number> } {
+  if (archive.kind === 'village') {
+    const v = archive.village
+    return {
+      notice: 'data.preview.village',
+      values: { stage: rt.t(`stage.${stageOf(v)}`), villagers: v.villagers, built: builtCount(v) },
+    }
+  }
+  return { notice: 'data.preview.backup', values: { villages: Object.keys(archive.villages).length } }
+}
+
+/** Reads a pasted code and asks for confirmation; nothing changes yet. */
+async function readImport($: EngineInterface, code: string): Promise<void> {
+  if (code.trim() === '') return say($, '')
+  const read = decodeArchive(code)
+  if ('error' in read) return say($, `data.error.${read.error}`)
+  const { notice, values } = preview(read.archive)
+  await say($, notice, values, { pending: code })
+}
+
+/**
+ * Puts an imported village or backup in place, after keeping what it
+ * replaces so the import can be undone. A village replaces this project's;
+ * a backup replaces the villages it holds and the device's record.
+ */
+async function confirmImport($: EngineInterface): Promise<void> {
+  const { pending } = await read($, transfer)
+  const decoded = decodeArchive(pending)
+  if ('error' in decoded) return say($, `data.error.${decoded.error}`)
+  const { archive } = decoded
+  await saveNow($)
+  const incoming: Record<string, unknown> =
+    archive.kind === 'village' ? { [rt.storeKey]: archive.village } : { ...archive.villages, [PROFILE_KEY]: archive.profile }
+  const entries: Record<string, unknown> = {}
+  for (const key of Object.keys(incoming)) entries[key] = (await $.store.get(key)) ?? null
+  await $.store.set(BACKUP_KEY, { at: await $.clock.now(), entries })
+  rt.canUndoImport = true
+  for (const [key, value] of Object.entries(incoming)) await $.store.set(key, value)
+  const imported = restore(await $.store.get(rt.storeKey))
+  adopt(imported ? await withFound($, imported) : rt.village)
+  await saveNow($)
+  await update($, revision, n => n + 1)
+  await say($, 'data.imported')
+}
+
+/** Puts back what the last import replaced. */
+async function undoImport($: EngineInterface): Promise<void> {
+  const backup = (await $.store.get(BACKUP_KEY)) as { entries?: Record<string, unknown> } | undefined
+  const entries = typeof backup?.entries === 'object' && backup.entries !== null ? backup.entries : {}
+  for (const [key, value] of Object.entries(entries)) {
+    if (!isVillageKey(key) && key !== PROFILE_KEY) continue
+    if (value === null) await $.store.delete(key)
+    else await $.store.set(key, value)
+  }
+  await $.store.delete(BACKUP_KEY)
+  rt.canUndoImport = false
+  const root = rt.storeKey.slice(VILLAGE_KEY_PREFIX.length)
+  adopt(restore(await $.store.get(rt.storeKey)) ?? (await freshVillage($, seedFrom(root))))
+  await saveNow($)
+  await update($, revision, n => n + 1)
+  await say($, 'data.undone')
+}
+
 async function runCommand($: EngineInterface, args: string): Promise<{ text: string }> {
   await ensureStarted($)
   const { t } = rt
@@ -398,12 +605,14 @@ async function runCommand($: EngineInterface, args: string): Promise<{ text: str
       await openSettings($)
       return { text: t('command.settings') }
     case 'stats':
-      return { text: `${summary()}\n${progressLine()}\n${statsText()}` }
+      await saveNow($)
+      return { text: [summary(), progressLine(), statsText(), lifetimeText(await readProfile($)), collectionText()].join('\n') }
     case 'reset':
       if (arg !== 'confirm') return { text: t('command.resetConfirm') }
-      rt.village = createVillage(rt.village.seed, await $.clock.now())
-      rt.scene = createScene(rt.village)
-      await $.store.set(rt.storeKey, rt.village)
+      // The device-wide record keeps the work done; only this village starts over.
+      await saveNow($)
+      adopt(await freshVillage($, rt.village.seed))
+      await saveNow($)
       await update($, revision, n => n + 1)
       return { text: t('command.reset') }
     default:
@@ -523,7 +732,7 @@ export const register: Register = (on, options) => {
     await ensureStarted($)
     const mount = layout(e.surface, e.props.bodyColumns, 'medium')
     rt.mounts.set(e.requestId, mount)
-    const lines = [summary(), progressLine(), statsText()]
+    const lines = [summary(), progressLine(), statsText(), collectionText()]
     if (e.surface === 'terminal') {
       const { Box, Text, Raster, Image } = $.ui.resolve(e)
       return (
@@ -578,14 +787,21 @@ export const register: Register = (on, options) => {
     const { t } = rt
     const label = (field: SettingField, value: string) => t(`option.${field}.${value}` as Parameters<Translate>[0])
     const hidden = await read($, isHidden)
+    const data = await read($, transfer)
+    const notice = data.notice === '' ? undefined : t(data.notice as MessageKey, data.values)
+    const exports = [
+      { key: 'export-village', label: t('data.exportVillage'), onPress: (p: { surface: RenderSurface }) => exportCode($, 'village', p.surface) },
+      { key: 'export-backup', label: t('data.exportBackup'), onPress: (p: { surface: RenderSurface }) => exportCode($, 'backup', p.surface) },
+    ]
+    const undo = { key: 'import-undo', label: t('data.undo'), onPress: () => undoImport($) }
     const visibility = {
       key: 'visibility',
       label: t(hidden ? 'settings.showVillage' : 'settings.hideVillage'),
       onPress: () => setBandHidden($, !hidden),
     }
     if (e.surface === 'mobile') {
-      // No Select on mobile: one Button per choice, the current one marked.
-      const { Box, Text, Button } = $.ui.resolve(e)
+      // No Select or Input on mobile: one Button per choice, the current one marked.
+      const { Box, Text, Button, Code } = $.ui.resolve(e)
       return (
         <Box flexDirection="column">
           <Text dimColor>{t('settings.hint')}</Text>
@@ -607,10 +823,20 @@ export const register: Register = (on, options) => {
               </Box>
             )
           })}
+          <Box key="data" flexDirection="column">
+            <Text bold>{t('data.title')}</Text>
+            <Text dimColor>{t('data.hintMobile')}</Text>
+            {exports.map(button => (
+              <Button {...button} />
+            ))}
+            {rt.canUndoImport && <Button {...undo} />}
+            {notice !== undefined && <Text>{notice}</Text>}
+            {data.shown !== '' && <Code source={data.shown} />}
+          </Box>
         </Box>
       )
     }
-    const { Box, Text, Button, Select } = $.ui.resolve(e)
+    const { Box, Text, Button, Select, Input, Code } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
         <Text dimColor>{t('settings.hint')}</Text>
@@ -627,6 +853,31 @@ export const register: Register = (on, options) => {
             onSelect={value => changeSetting($, setting.field, value)}
           />
         ))}
+        <Box key="data" flexDirection="column">
+          <Text bold>{t('data.title')}</Text>
+          <Text dimColor>{t('data.hint')}</Text>
+          <Box flexDirection="row" gap={2}>
+            {exports.map(button => (
+              <Button {...button} />
+            ))}
+            {rt.canUndoImport && <Button {...undo} />}
+          </Box>
+          <Input
+            key="import"
+            label={t('data.import')}
+            placeholder={t('data.importPlaceholder')}
+            submitLabel={t('data.read')}
+            onSubmit={value => readImport($, value)}
+          />
+          {notice !== undefined && <Text>{notice}</Text>}
+          {data.pending !== '' && (
+            <Box flexDirection="row" gap={2}>
+              <Button key="import-confirm" label={t('data.confirm')} variant="primary" onPress={() => confirmImport($)} />
+              <Button key="import-cancel" label={t('data.cancel')} onPress={() => say($, '')} />
+            </Box>
+          )}
+          {data.shown !== '' && <Code source={data.shown} />}
+        </Box>
       </Box>
     )
   })

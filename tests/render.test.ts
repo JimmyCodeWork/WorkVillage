@@ -97,3 +97,177 @@ describe('svg', () => {
     expect([...drawn]).toEqual([...frame.pixels].map(c => c & 0xffffff))
   })
 })
+
+describe('work', () => {
+  const working = (scene: ReturnType<typeof createScene>) => scene.walkers.filter(w => w.phase === 'working')
+
+  test('a tree takes many blows, falls, and only then becomes a stump', () => {
+    let village = createVillage(1, 0)
+    const scene = createScene(village)
+    const outcome = applySignal(village, 'edit')
+    expect(outcome.action?.kind).toBe('chop')
+    village = outcome.village
+    enqueue(scene, outcome.action!, village)
+    syncScene(scene, village)
+    const plot = outcome.action!.plot
+    let blows = 0
+    let fellAt = -1
+    for (let i = 0; i < 300 && scene.holds.has(plot); i++) {
+      const chips = scene.chips.length
+      stepScene(scene, false)
+      if (scene.chips.length > chips && fellAt < 0) blows++
+      if (fellAt < 0 && scene.effects.get(plot)?.kind === 'falling') fellAt = i
+    }
+    expect(blows).toBeGreaterThanOrEqual(6)
+    expect(fellAt).toBeGreaterThan(-1)
+    expect(scene.holds.has(plot)).toBe(false)
+    expect(scene.effects.size).toBe(0)
+  })
+
+  test('idle villagers lend a hand, and one carries the timber home', () => {
+    let village = { ...createVillage(1, 0), villagers: 3 }
+    const scene = createScene(village)
+    const outcome = applySignal(village, 'edit')
+    village = outcome.village
+    enqueue(scene, outcome.action!, village)
+    syncScene(scene, village)
+    let crew = 0
+    for (let i = 0; i < 300 && scene.holds.size > 0; i++) {
+      stepScene(scene, false)
+      crew = Math.max(crew, working(scene).length)
+    }
+    // Felling takes two: the one who took the job and one helper.
+    expect(crew).toBe(2)
+    const bearers = scene.walkers.filter(w => w.carry === 'log')
+    expect(bearers.length).toBe(1)
+    // The other is empty-handed and free for the next job at once.
+    expect(scene.walkers.filter(w => w.phase === 'returning' && w.carry === undefined).length).toBe(1)
+  })
+
+  test('the next job is taken on the way back, without first returning to the fire', () => {
+    let village = { ...createVillage(1, 0), villagers: 2 }
+    const scene = createScene(village)
+    for (const signal of ['edit', 'edit'] as const) {
+      const outcome = applySignal(village, signal)
+      village = outcome.village
+      enqueue(scene, outcome.action!, village)
+      syncScene(scene, village)
+    }
+    // Both jobs are taken at once; nobody waits by the fire while work is queued.
+    stepScene(scene, false)
+    expect(scene.queue.length).toBe(0)
+    expect(scene.walkers.every(w => w.phase === 'toWork')).toBe(true)
+  })
+
+  test('at night nobody joins a job; they gather by the fire', () => {
+    let village = { ...createVillage(1, 0), villagers: 3 }
+    const scene = createScene(village)
+    const outcome = applySignal(village, 'edit')
+    village = outcome.village
+    enqueue(scene, outcome.action!, village)
+    syncScene(scene, village)
+    let crew = 0
+    for (let i = 0; i < 300; i++) {
+      stepScene(scene, true)
+      crew = Math.max(crew, working(scene).length)
+    }
+    expect(crew).toBe(1)
+  })
+})
+
+describe('seasons', () => {
+  const inSeason = (n: number) => {
+    const v = createVillage(1, 0)
+    return { ...v, stats: { ...v.stats, actions: n * 40 } }
+  }
+  const grassRow = (n: number) => {
+    const frame = renderFrame(inSeason(n), createScene(inSeason(n)), 80, { hour: 12 }, { height: 20 })
+    return Array.from(frame.pixels.slice(16 * 80, 17 * 80))
+  }
+
+  test('winter lays snow on the ground, autumn turns it gold', () => {
+    const spring = grassRow(0)
+    const autumn = grassRow(2)
+    const winter = grassRow(3)
+    const isSnow = (c: number) => ((c >> 16) & 255) > 200 && ((c >> 8) & 255) > 200 && (c & 255) > 200
+    expect(winter.filter(isSnow).length).toBeGreaterThan(winter.length / 2)
+    // In spring only a birch trunk or the fire's core is that bright.
+    expect(spring.filter(isSnow).length).toBeLessThan(spring.length / 10)
+    expect(autumn).not.toEqual(spring)
+  })
+})
+
+describe('homes', () => {
+  const settled = () => {
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 150; i++) v = applySignal(v, signals[i % signals.length]!).village
+    return v
+  }
+
+  test('after dark villagers with a home go in; the one at the camp stays by the fire', () => {
+    const v = settled()
+    const scene = createScene(v)
+    for (let i = 0; i < 400; i++) stepScene(scene, true)
+    expect(scene.walkers[0]!.phase).not.toBe('inside')
+    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
+    // In the morning they come out again.
+    for (let i = 0; i < 40; i++) stepScene(scene, false)
+    expect(scene.walkers.filter(w => w.phase === 'inside').length).toBeLessThan(scene.walkers.length / 2)
+  })
+
+  test('work at night brings a villager out of the house', () => {
+    let v = settled()
+    const scene = createScene(v)
+    for (let i = 0; i < 400; i++) stepScene(scene, true)
+    const outcome = applySignal(v, 'edit')
+    v = outcome.village
+    enqueue(scene, outcome.action!, v)
+    syncScene(scene, v)
+    stepScene(scene, true)
+    expect(scene.queue.length).toBe(0)
+    expect(scene.walkers.some(w => w.phase === 'toWork')).toBe(true)
+  })
+})
+
+describe('fishing', () => {
+  const pondVillage = () => {
+    const v = createVillage(5, 0)
+    return { ...v, plots: v.plots.map((p, i) => (i === 2 ? ({ kind: 'pond' } as const) : p)) }
+  }
+
+  test('a fishing trip ends with something held up', () => {
+    let v = pondVillage()
+    const scene = createScene(v)
+    const outcome = applySignal(v, 'turn')
+    v = outcome.village
+    enqueue(scene, outcome.action!, v)
+    syncScene(scene, v)
+    const seen = new Set<string>()
+    for (let i = 0; i < 400; i++) {
+      stepScene(scene, false)
+      const w = scene.walkers[0]!
+      if (w.phase === 'working') seen.add(w.pose)
+      if (w.caught && w.step === 4) seen.add(`caught:${w.caught}`)
+    }
+    expect([...seen]).toEqual(expect.arrayContaining(['rodCast', 'rodOut', 'rodPull', 'holdUp']))
+    expect([...seen].some(s => s.startsWith('caught:'))).toBe(true)
+  })
+
+  test('work never waits on fishing: the line comes in for it', () => {
+    let v = pondVillage()
+    const scene = createScene(v)
+    const fish = applySignal(v, 'turn')
+    v = fish.village
+    enqueue(scene, fish.action!, v)
+    syncScene(scene, v)
+    for (let i = 0; i < 60; i++) stepScene(scene, false)
+    expect(scene.walkers[0]!.action?.kind).toBe('fish')
+    const work = applySignal(v, 'edit')
+    v = work.village
+    enqueue(scene, work.action!, v)
+    syncScene(scene, v)
+    stepScene(scene, false)
+    expect(scene.walkers[0]!.action?.kind).toBe(work.action!.kind)
+  })
+})

@@ -35,25 +35,49 @@ Requires Claude Code 2.1.275 or later.
 
 ## How your work shapes the village
 
-| What happens in your session | What the villagers do |
-| --- | --- |
-| A file is edited | Fell a tree or clear a stump for **timber**, or work on the current building |
-| A new file is written | Quarry a boulder for **stone** |
-| Files are read or searched | Read by the fire for **knowledge**; now and then forage for food |
-| Claude thinks before answering, or hands work to a subagent | Ponder by the fire for more **knowledge** |
+The village grows with the work you and Claude do together. Editing, writing, reading, thinking,
+testing and committing all set villagers to work: felling trees, quarrying stone, tending fields
+and raising buildings, and the village gains new settlers as tasks are completed. There is no
+need to do anything for it; carry on with your project, and the village keeps pace.
 
-Every 4 knowledge becomes a planned step on the building under way, so reading and thinking help
-the village grow too.
-| A test run passes | Plant, water and harvest fields for **food** |
-| A `git commit` succeeds | A milestone: a big push on the current building |
-| A to-do or task is completed | A new villager arrives, if there is a home for them |
+Villagers see each job through: a tree takes many blows of the axe, falls and is cut to length,
+and a boulder is struck until it cracks and breaks apart. Villagers with nothing to do lend a hand
+with the work under way, and once a storehouse stands, timber and stone are carried there.
 
 Buildings are raised in order: Tent, Hut, Well, Storehouse, House, Workshop and Watchtower.
 Each costs timber and stone and takes several steps of work to finish. When the trees near the
-camp are gone, the clearing extends further into the forest. The sky follows your local time,
-and at night the villagers gather around the fire.
+camp are gone, the clearing extends further into the forest. The sky follows your local time.
+Villagers with a home go in after dark, and its windows light up while someone is in; the one who
+keeps the camp stays by the fire. By day they now and then look in at home, and work that comes in
+at night brings someone out of the house.
+
+The wild has ponds in it, and a village with none near digs one once it has a few buildings. In
+quiet moments a villager goes fishing: the float bobs, something bites, and the villager holds up
+the catch, most often a fish, now and then something else. Work never waits on fishing; the line
+comes in when there is a job to do.
+
+The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
+and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves
+in autumn, and snow on the roofs and smoke from the chimneys in winter. The season is shown in the
+row above the village.
+
+| Spring | Summer | Autumn | Winter |
+| --- | --- | --- | --- |
+| ![Spring](docs/images/07-spring.png) | ![Summer](docs/images/07-summer.png) | ![Autumn](docs/images/07-autumn.png) | ![Winter](docs/images/07-winter.png) |
 
 Failed tool calls never cost you anything: the village only ever grows.
+
+### Every village is its own
+
+Each village grows a forest of its own and has a colour of its own, which about half its buildings
+are raised in. Every building is given its look when it is placed: the colour of its roof, which
+way it faces, and something set down beside it, such as barrels, crates or a woodpile. New
+buildings go up on either side of the camp, so no two villages are laid out alike.
+
+More styles are found as you work on your projects: other roof colours, and new things to set
+beside a building. A toast says when one is found, and it can turn up on any village's next
+buildings. `/village stats` and the `/village` pane list the styles found so far; what is still to
+be found, and how, is left for your work to turn up.
 
 ## Commands
 
@@ -61,7 +85,7 @@ Failed tool calls never cost you anything: the village only ever grows.
 | --- | --- |
 | `/village` | Open the village pane with resources and activity |
 | `/village show` / `/village hide` | Show or hide the band above the prompt |
-| `/village stats` | Print the village's resources and your activity |
+| `/village stats` | Print the village's resources, your activity, the totals for every project on this device and the styles found |
 | `/village settings` | Open the settings panel |
 | `/village reset confirm` | Return this project's village to wilderness |
 
@@ -78,6 +102,25 @@ under **workvillage**.
 | `pixel` | `small`, `medium`, `large` (see below) | `small` |
 | `language` | `auto`, `en`, `zh-TW` | `auto` (follows `LC_ALL`, `LC_MESSAGES` or `LANG`) |
 | `animation` | `full`, `reduced`, `off` | `full` |
+
+### Export and import
+
+The settings panel also keeps your villages safe and lets you move them:
+
+- **Copy this village** puts an export code for this project's village on the clipboard.
+- **Copy a full backup** copies every village on this device together with its lifetime record.
+  A backup names each project's folder, so it can put each village back in place; keep it to
+  yourself.
+- **Import**: paste a code and press Enter. WorkVillage shows what the code holds and changes
+  nothing until you confirm. A village replaces this project's village; a backup replaces the
+  villages it holds and the lifetime record.
+- **Undo import** puts back whatever the last import replaced.
+
+Where the clipboard is not available, the code is shown in the panel to copy by hand. Importing
+needs a text field, so it is available in the terminal and the desktop app. An export code holds
+only counts and the village's layout, never file names, contents or commands. Close other Claude
+Code sessions of the same project before importing into it: a session still open keeps its own
+copy of the village and saves it over the import.
 
 ### Black and white
 
@@ -114,7 +157,8 @@ The `mono` palettes draw the village as black-and-white line art, in a light and
 WorkVillage makes no network requests and sends no telemetry. It only counts what kind of work
 happened (an edit, a read, a passing test). It never stores file names, file contents, commands or
 prompts. Each project's village is saved in WorkVillage's own plugin store, keyed by the project's
-root directory.
+root directory, beside one lifetime record for the device: the work of every project added up,
+and a short summary of each village.
 
 ## Development
 

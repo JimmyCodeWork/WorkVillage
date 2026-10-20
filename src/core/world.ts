@@ -2,13 +2,30 @@
 // nothing here touches the host, so it is easy to test and to balance.
 
 import {
+  ACCENT_SHARE,
+  BASE_PROPS,
+  BASE_ROOFS,
   BUILD_ORDER,
   BUILDINGS,
   CAPACITY,
+  PROPS,
   REWARDS,
+  ROOFS,
+  SEASON_ACTIONS,
   WORLD,
   type BuildingKind,
+  type PropStyle,
+  type RoofStyle,
 } from './balance'
+
+/** How one building looks, chosen when it is placed and kept for good. */
+export type Look = { roof: RoofStyle; prop: PropStyle; mirrored: boolean }
+
+/**
+ * The styles a village's new buildings are drawn from, and its own colour,
+ * which about half of them are raised in.
+ */
+export type Kit = { roofs: RoofStyle[]; props: PropStyle[]; accent: RoofStyle }
 
 export type Plot =
   | { kind: 'tree'; variant: number }
@@ -16,8 +33,9 @@ export type Plot =
   | { kind: 'stump' }
   | { kind: 'grass' }
   | { kind: 'camp' }
+  | { kind: 'pond' }
   | { kind: 'farm'; growth: number }
-  | { kind: 'building'; building: BuildingKind; progress: number }
+  | { kind: 'building'; building: BuildingKind; progress: number; look?: Look }
 
 export type Resources = { wood: number; stone: number; food: number; knowledge: number }
 
@@ -45,6 +63,7 @@ export type Village = {
   /** Index into BUILD_ORDER of the next building to place. */
   nextBuild: number
   createdAt: number
+  kit: Kit
 }
 
 export type Signal = 'edit' | 'create' | 'read' | 'think' | 'test' | 'commit' | 'task' | 'turn'
@@ -62,6 +81,7 @@ export type ActionKind =
   | 'celebrate'
   | 'study'
   | 'ponder'
+  | 'fish'
 
 /** What a villager should be seen doing for a signal. */
 export type Action = {
@@ -99,13 +119,39 @@ export function hash01(seed: number, n: number): number {
   return random((seed ^ Math.imul(n, 0x9e3779b1)) >>> 0)()
 }
 
+const TREE_KINDS = 3
+
 export function wildPlot(seed: number, index: number): Plot {
   const r = hash01(seed, index)
   if (r < 0.14) return { kind: 'rock', variant: Math.floor(hash01(seed + 7, index) * 2) }
-  return { kind: 'tree', variant: Math.floor(hash01(seed + 13, index) * 3) }
+  if (r < 0.14 + WORLD.pondShare && index !== 0 && index !== 1) return { kind: 'pond' }
+  // Each forest has a tree of its own that grows in about half its plots.
+  const own = seed % TREE_KINDS
+  const variant = hash01(seed + 17, index) < 0.5 ? own : Math.floor(hash01(seed + 13, index) * TREE_KINDS)
+  return { kind: 'tree', variant }
 }
 
-export function createVillage(seed: number, now: number): Village {
+/** The styles every village starts with, its own colour picked by its seed. */
+export function baseKit(seed: number): Kit {
+  return { roofs: [...BASE_ROOFS], props: [...BASE_PROPS], accent: BASE_ROOFS[Math.floor(hash01(seed + 23, 0) * BASE_ROOFS.length)]! }
+}
+
+/**
+ * Adds styles found since to a village's kit. A new village takes its own
+ * colour from everything found so far; an older one keeps the colour it has.
+ */
+export function withStyles(kit: Kit, roofs: readonly RoofStyle[], props: readonly PropStyle[]): Kit {
+  const order = <T>(all: readonly T[], has: readonly T[]) => all.filter(item => has.includes(item))
+  return {
+    roofs: order(ROOFS, [...kit.roofs, ...roofs]),
+    props: order(PROPS, [...kit.props, ...props]),
+    accent: kit.accent,
+  }
+}
+
+export function createVillage(seed: number, now: number, found: { roofs: readonly RoofStyle[]; props: readonly PropStyle[] } = { roofs: [], props: [] }): Village {
+  const kit = withStyles(baseKit(seed), found.roofs, found.props)
+  kit.accent = kit.roofs[Math.floor(hash01(seed + 23, 1) * kit.roofs.length)]!
   const plots: Plot[] = []
   const half = Math.floor(WORLD.initialPlots / 2)
   for (let i = 0; i < WORLD.initialPlots; i++) plots.push(wildPlot(seed, i - half))
@@ -122,7 +168,19 @@ export function createVillage(seed: number, now: number): Village {
     stats: { edits: 0, reads: 0, tests: 0, commits: 0, tasks: 0, turns: 0, actions: 0, thoughts: 0 },
     nextBuild: 0,
     createdAt: now,
+    kit,
   }
+}
+
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter'
+const SEASONS: readonly Season[] = ['spring', 'summer', 'autumn', 'winter']
+
+/**
+ * The village's season. It turns with the work done, not the calendar, so a
+ * year passes in a few hours of work and stands still while nobody works.
+ */
+export function seasonOf(village: Village): Season {
+  return SEASONS[Math.floor(village.stats.actions / SEASON_ACTIONS) % SEASONS.length]!
 }
 
 export function stageOf(village: Village): Stage {
@@ -221,15 +279,25 @@ function count(village: Village, key: keyof Stats): Village {
   return { ...village, stats: { ...village.stats, [key]: village.stats[key] + 1 } }
 }
 
+/** A look for the next building, from the village's kit; the same seed always gives the same village. */
+function chooseLook(village: Village): Look {
+  const { kit, seed, nextBuild: n } = village
+  const pick = <T>(items: readonly T[], salt: number): T => items[Math.floor(hash01(seed + salt, n) * items.length)]!
+  const roof = hash01(seed + 31, n) < ACCENT_SHARE ? kit.accent : pick(kit.roofs, 37)
+  return { roof, prop: pick(kit.props, 41), mirrored: hash01(seed + 43, n) < 0.5 }
+}
+
 /** Places the next building on open ground if it can be paid for. */
 function placeSite(village: Village): { village: Village; plot?: number } {
   const kind = nextBuilding(village)
   if (!canAfford(village, kind)) return { village }
-  const ground = nearest(village, p => p.kind === 'grass')
+  // One of the two nearest clearings, so the village grows out on either side.
+  const open = byDistance(village, p => p.kind === 'grass')
+  const ground = open.length > 1 && hash01(village.seed + 29, village.nextBuild) < 0.5 ? open[1] : open[0]
   if (ground === undefined) return { village }
   const cost = BUILDINGS[kind].cost
   let next = gain(village, { wood: -cost.wood, stone: -cost.stone })
-  next = withPlot(next, ground, { kind: 'building', building: kind, progress: 0 })
+  next = withPlot(next, ground, { kind: 'building', building: kind, progress: 0, look: chooseLook(village) })
   next = { ...next, nextBuild: next.nextBuild + 1 }
   return { village: next, plot: ground }
 }
@@ -286,10 +354,27 @@ function labour(village: Village, preferStone: boolean, milestones: Milestone[])
   }
   if (stump !== undefined) {
     const before = v.plots[stump]
-    v = gain(withPlot(v, stump, { kind: 'grass' }), { wood: REWARDS.clearWood })
+    // A settled village with no water near digs a pond where the stump was.
+    const digs = builtCount(v) >= WORLD.pondAfterBuilt && pondNear(v) === undefined
+    v = gain(withPlot(v, stump, digs ? { kind: 'pond' } : { kind: 'grass' }), { wood: REWARDS.clearWood })
     return { village: v, action: { kind: 'clear', plot: stump, before }, milestones }
   }
   return { village: v, action: forageAction(v), milestones }
+}
+
+/**
+ * The nearest pond within reach of the camp, in the village or in the
+ * wilderness beyond it, where the plot index runs past the village's ends.
+ */
+export function pondNear(village: Village): number | undefined {
+  for (let d = 1; d <= WORLD.fishingReach; d++) {
+    for (const index of [village.camp - d, village.camp + d]) {
+      const inside = index >= 0 && index < village.plots.length
+      const plot = inside ? village.plots[index]! : wildPlot(village.seed, index - village.camp)
+      if (plot.kind === 'pond') return index
+    }
+  }
+  return undefined
 }
 
 function neededStone(village: Village): number {
@@ -399,9 +484,16 @@ export function applySignal(village: Village, signal: Signal): Outcome {
           : { village: gain(v, { food: 2 }), milestones }
       break
     }
-    case 'turn':
-      outcome = { village: count(village, 'turns'), milestones }
+    case 'turn': {
+      // Claude has answered and waits: a villager goes fishing until there is work again.
+      const v = count(village, 'turns')
+      const pond = pondNear(v)
+      outcome =
+        pond === undefined
+          ? { village: v, milestones }
+          : { village: gain(v, { food: REWARDS.fishFood }), action: { kind: 'fish', plot: pond, before: undefined }, milestones }
       break
+    }
   }
 
   let v = outcome.village
@@ -422,12 +514,105 @@ export function applySignal(village: Village, signal: Signal): Outcome {
   return { village: v, action, milestones }
 }
 
-/** Reads a saved village back, or undefined when it is not one. */
+/** Larger than any count a village reaches by work; past it a value is not a village's. */
+const MAX_COUNT = 1e9
+const STAT_KEYS: readonly (keyof Stats)[] = ['edits', 'reads', 'tests', 'commits', 'tasks', 'turns', 'actions', 'thoughts']
+
+function isCount(value: unknown, max = MAX_COUNT): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max
+}
+
+function restoreLook(value: unknown): Look | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const l = value as Record<string, unknown>
+  if (!ROOFS.includes(l.roof as RoofStyle) || !PROPS.includes(l.prop as PropStyle) || typeof l.mirrored !== 'boolean') return undefined
+  return { roof: l.roof as RoofStyle, prop: l.prop as PropStyle, mirrored: l.mirrored }
+}
+
+function restoreKit(value: unknown, seed: number): Kit | undefined {
+  // Villages saved before styles existed start with the base kit.
+  if (value === undefined) return baseKit(seed)
+  if (typeof value !== 'object' || value === null) return undefined
+  const k = value as Record<string, unknown>
+  const isList = <T extends string>(list: unknown, all: readonly T[]): list is T[] =>
+    Array.isArray(list) && list.length > 0 && list.length <= all.length && list.every(item => all.includes(item as T)) && new Set(list).size === list.length
+  if (!isList(k.roofs, ROOFS) || !isList(k.props, PROPS) || !k.roofs.includes(k.accent as RoofStyle)) return undefined
+  return { roofs: [...k.roofs], props: [...k.props], accent: k.accent as RoofStyle }
+}
+
+function restorePlot(value: unknown): Plot | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const p = value as Record<string, unknown>
+  switch (p.kind) {
+    case 'tree':
+    case 'rock':
+      return isCount(p.variant, 15) ? { kind: p.kind, variant: p.variant } : undefined
+    case 'stump':
+    case 'grass':
+    case 'camp':
+    case 'pond':
+      return { kind: p.kind }
+    case 'farm':
+      return isCount(p.growth, 100) ? { kind: 'farm', growth: p.growth } : undefined
+    case 'building': {
+      if (typeof p.building !== 'string' || !Object.hasOwn(BUILDINGS, p.building)) return undefined
+      const building = p.building as BuildingKind
+      if (!isCount(p.progress, BUILDINGS[building].steps)) return undefined
+      if (p.look === undefined) return { kind: 'building', building, progress: p.progress }
+      const look = restoreLook(p.look)
+      return look && { kind: 'building', building, progress: p.progress, look }
+    }
+    default:
+      return undefined
+  }
+}
+
+/**
+ * Reads a saved or imported village back, or undefined when it is not one.
+ * Every field is checked and only known fields are kept, since an imported
+ * code may come from anywhere.
+ */
 export function restore(value: unknown): Village | undefined {
   if (typeof value !== 'object' || value === null) return undefined
-  const v = value as Partial<Village>
-  if (v.version !== 1 || !Array.isArray(v.plots) || typeof v.camp !== 'number') return undefined
+  const v = value as Record<string, unknown>
+  if (v.version !== 1 || !isCount(v.seed, 0xffffffff) || !Array.isArray(v.plots)) return undefined
+  if (v.plots.length === 0 || v.plots.length > WORLD.maxPlots) return undefined
+  const plots: Plot[] = []
+  for (const item of v.plots) {
+    const plot = restorePlot(item)
+    if (plot === undefined) return undefined
+    plots.push(plot)
+  }
+  if (!isCount(v.camp, plots.length - 1) || plots[v.camp]?.kind !== 'camp') return undefined
+  if (plots.filter(p => p.kind === 'camp').length !== 1) return undefined
+  if (!isCount(v.villagers) || v.villagers < 1 || !isCount(v.nextBuild)) return undefined
+  if (typeof v.createdAt !== 'number' || !Number.isFinite(v.createdAt)) return undefined
+  const kit = restoreKit(v.kit, v.seed)
+  if (kit === undefined) return undefined
+
+  const r = (typeof v.resources === 'object' && v.resources !== null ? v.resources : {}) as Record<string, unknown>
+  const resources = { wood: r.wood, stone: r.stone, food: r.food, knowledge: r.knowledge ?? 0 }
+  if (!Object.values(resources).every(n => isCount(n))) return undefined
+
   // Villages saved before a counter existed start it at zero.
-  const stats = { edits: 0, reads: 0, tests: 0, commits: 0, tasks: 0, turns: 0, actions: 0, thoughts: 0, ...v.stats }
-  return { ...(v as Village), stats }
+  const s = (typeof v.stats === 'object' && v.stats !== null ? v.stats : {}) as Record<string, unknown>
+  const stats = {} as Stats
+  for (const key of STAT_KEYS) {
+    const n = s[key] ?? 0
+    if (!isCount(n)) return undefined
+    stats[key] = n
+  }
+
+  return {
+    version: 1,
+    seed: v.seed,
+    plots,
+    camp: v.camp,
+    villagers: v.villagers,
+    resources: resources as Resources,
+    stats,
+    nextBuild: v.nextBuild,
+    createdAt: v.createdAt,
+    kit,
+  }
 }

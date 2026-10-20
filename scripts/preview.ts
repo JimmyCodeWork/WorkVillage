@@ -5,6 +5,7 @@ import { deflateSync } from 'node:zlib'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { SEASON_ACTIONS } from '../src/core/balance'
 import { applySignal, createVillage, type Signal, type Village } from '../src/core/world'
 import type { Canvas } from '../src/pixel/canvas'
 import { renderFrame } from '../src/scene/render'
@@ -86,7 +87,8 @@ const shots: [string, number, number, number][] = [
 ]
 for (const [name, signals, frames, hour] of shots) {
   run(signals, frames)
-  for (let f = 0; f < 12; f++) stepScene(scene, hour >= 20)
+  // At night give the villagers time to walk home and light their windows.
+  for (let f = 0; f < (hour >= 20 ? 900 : 12); f++) stepScene(scene, hour >= 20)
   const frame = renderFrame(village, scene, 160, { hour })
   writeFileSync(join(out, `${name}.png`), png(frame, 6))
   if (name === '04-village') {
@@ -99,3 +101,11 @@ for (const [name, signals, frames, hour] of shots) {
   }
   console.log(name, JSON.stringify(village.resources), 'villagers', village.villagers, 'plots', village.plots.length)
 }
+
+// The finished village through the year: the same village, its work counted on to each season.
+const year = Math.floor(village.stats.actions / (SEASON_ACTIONS * 4)) * SEASON_ACTIONS * 4
+for (const [name, season] of [['07-spring', 0], ['07-summer', 1], ['07-autumn', 2], ['07-winter', 3]] as const) {
+  const seasonal = { ...village, stats: { ...village.stats, actions: year + season * SEASON_ACTIONS } }
+  writeFileSync(join(out, `${name}.png`), png(renderFrame(seasonal, scene, 120, { hour: 12 }, { height: 14 }), 6))
+}
+
