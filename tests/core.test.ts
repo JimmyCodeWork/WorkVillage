@@ -403,3 +403,77 @@ describe('what gets built', () => {
     expect(saw).toBe(true)
   })
 })
+
+describe('landmarks', () => {
+  const signals = ['edit', 'edit', 'commit', 'task', 'create', 'test', 'read', 'think'] as const
+  const grow = (seed: number, count: number, list: readonly Signal[] = signals) => {
+    let v = createVillage(seed, 0)
+    const built: string[] = []
+    for (let i = 0; i < count; i++) {
+      const outcome = applySignal(v, list[i % list.length]!)
+      for (const m of outcome.milestones) if (m.kind === 'built') built.push(m.building)
+      v = outcome.village
+    }
+    return { v, built }
+  }
+
+  test('a grown village raises a windmill, a library and a clock tower, one of each, paid for in knowledge', () => {
+    for (const seed of [1, 21, 40]) {
+      const { v, built } = grow(seed, 4000)
+      for (const kind of ['windmill', 'library', 'clocktower']) expect(built.filter(b => b === kind).length).toBe(1)
+      expect(v.plots.filter(p => p.kind === 'building' && p.building === 'windmill').length).toBe(1)
+    }
+  })
+
+  test('the windmill stands out on the edge; the library and clock tower near the middle', () => {
+    const { v } = grow(21, 4000)
+    const at = (kind: string) => Math.abs(v.plots.findIndex(p => p.kind === 'building' && p.building === kind) - v.camp)
+    expect(at('windmill')).toBeGreaterThan(at('library'))
+  })
+
+  test('a village with no knowledge never waits on a landmark: the rest is built all the same', () => {
+    const { v } = grow(21, 2000, ['edit', 'edit', 'commit', 'task', 'create', 'test'])
+    expect(v.villagers).toBe(20)
+    expect(v.plots.some(p => p.kind === 'building' && ['windmill', 'library', 'clocktower'].includes(p.building))).toBe(false)
+  })
+})
+
+describe('making the village finer', () => {
+  test('once everything is built: a path out from the fire, fences round the fields, flower beds on open ground', () => {
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create', 'test', 'read', 'think'] as const
+    let pathsBeforeDone = 0
+    for (let i = 0; i < 4000; i++) {
+      v = applySignal(v, signals[i % signals.length]!).village
+      if (nextBuilding(v) !== undefined) pathsBeforeDone = v.paths.length
+    }
+    expect(nextBuilding(v)).toBeUndefined()
+    expect(v.paths.length).toBeGreaterThan(pathsBeforeDone)
+    // The path starts at the fire and runs outwards.
+    expect(v.paths).toContain(v.camp)
+    const farms = v.plots.flatMap((p, i) => (p.kind === 'farm' ? [i] : []))
+    expect(farms.every(i => v.fences.includes(i))).toBe(true)
+    expect(v.plots.some(p => p.kind === 'garden')).toBe(true)
+  })
+
+  test('nothing is made finer while there is still building to do', () => {
+    let v = createVillage(21, 0)
+    for (let i = 0; i < 80; i++) v = applySignal(v, (['edit', 'commit', 'task', 'create'] as const)[i % 4]!).village
+    expect(nextBuilding(v)).toBeDefined()
+    expect(v.paths).toEqual([])
+    expect(v.fences).toEqual([])
+    expect(v.plots.some(p => p.kind === 'garden')).toBe(false)
+  })
+
+  test('paths, fences and gardens load back; out-of-place entries are refused', () => {
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create', 'test', 'read', 'think'] as const
+    for (let i = 0; i < 4000; i++) v = applySignal(v, signals[i % signals.length]!).village
+    const saved = JSON.parse(JSON.stringify(v))
+    expect(restore(saved)?.paths).toEqual(v.paths)
+    expect(restore(saved)?.fences).toEqual(v.fences)
+    const { paths: _p, fences: _f, ...old } = saved
+    expect(restore(old)?.paths).toEqual([])
+    expect(restore({ ...saved, paths: [999] })).toBeUndefined()
+  })
+})

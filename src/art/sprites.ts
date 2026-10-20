@@ -311,6 +311,58 @@ export const FOUNTAIN = s([
   'qqqqqqqqqq',
 ])
 
+/** The windmill's tower and cap; its sails are drawn turning about the hub. */
+export const WINDMILL = s([
+  '...xx...',
+  '..xrrx..',
+  '.xrrrrx.',
+  '..QRRq..',
+  '..RRRq..',
+  '..QRRq..',
+  '..RiRq..',
+  '..QRRq..',
+  '.QRRRRq.',
+  '.RRDDRq.',
+  '.QRDDRq.',
+  'qqqqqqqq',
+])
+/** Where the windmill's sails turn, in the sprite. */
+export const WINDMILL_HUB = [3, 3] as const
+
+/** The library: a stone hall with white columns, its windows lit after dark. */
+export const LIBRARY = s([
+  '....xxxx....',
+  '..xxrrrrxx..',
+  'xxrrrrrrrrxx',
+  '.qqqqqqqqqq.',
+  '.uQiQuuQiQu.',
+  '.uQIQuuQIQu.',
+  '.uQQQDDQQQu.',
+  '.uQQQDDQQQu.',
+  'qqqqqDDqqqqq',
+])
+
+/** The clock tower; the hand on its face is drawn moving round. */
+export const CLOCKTOWER = s([
+  '...xx...',
+  '..xrrx..',
+  '.xrrrrx.',
+  '.QRRRRq.',
+  '.RuuuRq.',
+  '.RukuRq.',
+  '.RuuuRq.',
+  '.QRRRRq.',
+  '.RRIIRq.',
+  '.QRRRRq.',
+  '.RRRRRq.',
+  '.QRIIRq.',
+  '.RRRRRq.',
+  '.QRDDRq.',
+  '.qqDDqq.',
+])
+/** The centre of the clock face, in the sprite. */
+export const CLOCK_CENTRE = [3, 5] as const
+
 /** A street lamp on an iron post; its glass is lit after dark. */
 export const STREET_LAMP = s(['.k.', 'kik', 'kik', '.k.', '.k.', '.k.', '.k.', 'kkk'])
 

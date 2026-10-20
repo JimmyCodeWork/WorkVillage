@@ -24,6 +24,9 @@ export const zhTW: Messages = {
   'building.workshop': '工坊',
   'building.tower': '瞭望塔',
   'building.fountain': '噴泉',
+  'building.windmill': '風車',
+  'building.library': '圖書館',
+  'building.clocktower': '鐘樓',
 
   'resource.wood': '木材',
   'resource.stone': '石材',
@@ -45,6 +48,7 @@ export const zhTW: Messages = {
   'season.autumn': '秋',
   'season.winter': '冬',
   'summary.next': '下一個建設：{building}（木材 {wood}、石材 {stone}）',
+  'summary.nextLandmark': '下一個建設：{building}（木材 {wood}、石材 {stone}、知識 {knowledge}）',
   'summary.building': '建設中：{building} {percent}%',
   'summary.complete': '全部建設完成，村民照料著村莊。',
   'pane.stats': '開發活動',

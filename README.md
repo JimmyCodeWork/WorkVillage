@@ -89,10 +89,15 @@ storehouses, workshops and watchtowers, each kind as it becomes useful and no mo
 village of that size needs, and, once there are enough buildings, a single fountain whose water
 plays by day and freezes in winter. Homes go up only while there is room for more villagers. As the
 village grows, its tent is taken down and rebuilt as a hut, and later its huts as houses, with
-everyone keeping their home meanwhile. Where each goes depends on what it is: the fountain on the square kept free for it beside the fire,
-the watchtower out on the edge facing the forest, fields on the outskirts, and the rest near the
-fire. At most twenty villagers live in the village, and by day each spends its time near its own
-home.
+everyone keeping their home meanwhile. Where each goes depends on what it is: the fountain on the
+square kept free for it beside the fire, the watchtower out on the edge facing the forest, fields on
+the outskirts, and the rest near the fire. At most twenty villagers live in the village, and by day
+each spends its time near its own home.
+
+A village grown large enough raises landmarks, one of each, paid for mostly with the knowledge it
+has gathered: a windmill out by the fields, its sails turning, a library with white columns, and a
+clock tower whose hand goes round. Once everything is built, the villagers make the village finer:
+they lay a stone path out from the fire, fence the fields and turn open ground into flower beds.
 Each costs timber and stone and takes several steps of work to finish. When the trees near the
 camp are gone, the clearing extends further into the forest. The sky follows your local time.
 Villagers with a home go to bed after dark, and its windows light up while someone is in; the one

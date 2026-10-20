@@ -22,6 +22,9 @@ export const en = {
   'building.workshop': 'Workshop',
   'building.tower': 'Watchtower',
   'building.fountain': 'Fountain',
+  'building.windmill': 'Windmill',
+  'building.library': 'Library',
+  'building.clocktower': 'Clock tower',
 
   'resource.wood': 'Timber',
   'resource.stone': 'Stone',
@@ -43,6 +46,7 @@ export const en = {
   'season.autumn': 'Autumn',
   'season.winter': 'Winter',
   'summary.next': 'Next: {building} ({wood} timber, {stone} stone)',
+  'summary.nextLandmark': 'Next: {building} ({wood} timber, {stone} stone, {knowledge} knowledge)',
   'summary.building': 'Building: {building} {percent}%',
   'summary.complete': 'Everything is built; the villagers tend the village.',
   'pane.stats': 'Activity',
