@@ -300,14 +300,14 @@ export const CAUGHT_FISH = s(['.QQq.', 'QQQQq', '.QQq.'])
 export const CAUGHT_BOOT = s(['dd.', 'dd.', 'ddd'])
 export const CAUGHT_CHEST = s(['wWWw', 'dzzd', 'dddd'])
 
-/** The village rooster, facing right: walking, pecking, sitting and crowing at dawn. */
+/** The village rooster, facing right: walking, pecking, sitting and crowing at dawn. Red comb and wattle, yellow legs. */
 export const ROOSTER: Readonly<Record<'walk1' | 'walk2' | 'stand' | 'peck' | 'sit' | 'crow', Sprite>> = {
-  stand: s(['...x.', 'u..uF', 'uuuu.', '.uuu.', '.j.j.']),
-  walk1: s(['...x.', 'u..uF', 'uuuu.', '.uuu.', 'j...j']),
-  walk2: s(['...x.', 'u..uF', 'uuuu.', '.uuu.', '..j..']),
-  peck: s(['.....', 'u....', 'uuux.', '.uuuu', '.j.jF']),
-  sit: s(['...x.', 'u..uF', 'uuuu.', '.uuu.']),
-  crow: s(['....x', 'u..uF', 'u.uu.', 'uuuu.', '.uuu.', '.j.j.']),
+  stand: s(['...j.', 'u..uF', 'uuuuj', '.uuu.', '.z.z.']),
+  walk1: s(['...j.', 'u..uF', 'uuuuj', '.uuu.', 'z...z']),
+  walk2: s(['...j.', 'u..uF', 'uuuuj', '.uuu.', '..z..']),
+  peck: s(['.....', 'u....', 'uuuj.', '.uuuu', '.z.zF']),
+  sit: s(['...j.', 'u..uF', 'uuuuj', '.uuu.']),
+  crow: s(['....j', 'u..uF', 'u.uuj', 'uuuu.', '.uuu.', '.z.z.']),
 }
 
 export const FLOWER = s(['z', 'e'])
