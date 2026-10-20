@@ -1,9 +1,21 @@
 // Every number that shapes how fast the village grows, in one place.
 
-export type BuildingKind = 'tent' | 'hut' | 'well' | 'storehouse' | 'house' | 'workshop' | 'tower' | 'fountain'
+export type BuildingKind =
+  | 'tent'
+  | 'hut'
+  | 'well'
+  | 'storehouse'
+  | 'house'
+  | 'workshop'
+  | 'tower'
+  | 'fountain'
+  | 'windmill'
+  | 'library'
+  | 'clocktower'
 
 export type BuildingSpec = {
-  cost: { wood: number; stone: number }
+  /** Landmarks also cost knowledge, gathered from reading and thinking. */
+  cost: { wood: number; stone: number; knowledge?: number }
   /** Labour steps (edits) to finish once placed. */
   steps: number
   /** Villagers it houses once finished. */
@@ -19,6 +31,9 @@ export const BUILDINGS: Readonly<Record<BuildingKind, BuildingSpec>> = {
   workshop: { cost: { wood: 16, stone: 10 }, steps: 8, housing: 1 },
   tower: { cost: { wood: 18, stone: 16 }, steps: 10, housing: 1 },
   fountain: { cost: { wood: 4, stone: 20 }, steps: 8, housing: 0 },
+  windmill: { cost: { wood: 16, stone: 8, knowledge: 20 }, steps: 10, housing: 0 },
+  library: { cost: { wood: 12, stone: 14, knowledge: 30 }, steps: 10, housing: 0 },
+  clocktower: { cost: { wood: 10, stone: 22, knowledge: 40 }, steps: 12, housing: 0 },
 }
 
 /**
@@ -42,6 +57,10 @@ export const BUILD_RULES: Readonly<Record<Exclude<BuildingKind, 'fountain'>, Bui
   house: { from: 4, most: [[0, Infinity]], weight: 4 },
   workshop: { from: 5, most: [[0, 1], [14, 2]], weight: 2 },
   tower: { from: 8, most: [[0, 1], [14, 2]], weight: 1 },
+  // Landmarks: one of each, for a village grown large enough, paid for mostly in knowledge.
+  windmill: { from: 9, most: [[0, 1]], weight: 2 },
+  library: { from: 9, most: [[0, 1]], weight: 2 },
+  clocktower: { from: 14, most: [[0, 1]], weight: 2 },
 }
 
 /** As the village grows, old buildings are taken down and built again as something better. */
@@ -136,4 +155,15 @@ export const FOUNTAIN_AFTER_BUILT = 6
 
 /** A street lamp: what it costs, and how often one goes up while timber and stone are saved for the next building. */
 export const LAMP = { cost: { wood: 2, stone: 3 }, everyEdits: 4 } as const
+
+/**
+ * Once everything is built, the villagers make the village finer: a stone
+ * path in front of it, fences round the fields, and flower beds on open
+ * ground. What each costs.
+ */
+export const DECOR = {
+  path: { wood: 0, stone: 2 },
+  fence: { wood: 2, stone: 0 },
+  garden: { wood: 1, stone: 1 },
+} as const
 

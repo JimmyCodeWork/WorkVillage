@@ -217,7 +217,10 @@ function progressLine(): string {
   const next = nextBuilding(village)
   if (next === undefined) return t('summary.complete')
   const cost = BUILDINGS[next].cost
-  return t('summary.next', { building: t(`building.${next}`), wood: cost.wood, stone: cost.stone })
+  const values = { building: t(`building.${next}`), wood: cost.wood, stone: cost.stone }
+  // A landmark also wants knowledge, so say how much.
+  if (cost.knowledge) return t('summary.nextLandmark', { ...values, knowledge: cost.knowledge })
+  return t('summary.next', values)
 }
 
 function statsText(s: Stats = rt.village.stats): string {

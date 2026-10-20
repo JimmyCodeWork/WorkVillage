@@ -2,6 +2,11 @@
 
 import { P, ROOF_COLORS, SEASON_DRIFT, SEASON_LEAVES, seasonSky, skyFor, type Sky } from '../art/palette'
 import {
+  CLOCK_CENTRE,
+  CLOCKTOWER,
+  LIBRARY,
+  WINDMILL,
+  WINDMILL_HUB,
   FOUNTAIN,
   STREET_LAMP,
   BUSHES,
@@ -66,6 +71,9 @@ const BUILDING_ART: Readonly<Record<BuildingKind, Sprite>> = {
   workshop: WORKSHOP,
   tower: TOWER,
   fountain: FOUNTAIN,
+  windmill: WINDMILL,
+  library: LIBRARY,
+  clocktower: CLOCKTOWER,
 }
 
 const PROP_ART: Readonly<Record<Exclude<PropStyle, 'none'>, Sprite>> = {
@@ -195,6 +203,9 @@ function drawPlot(
     case 'grass':
       drawMeadow(canvas, x0, seed, index, season)
       break
+    case 'garden':
+      drawGarden(canvas, x0, seed, index, season)
+      break
     case 'farm': {
       drawSprite(canvas, FARM_SOIL, x0 + 1, GROUND)
       // Fields lie fallow under the snow until spring.
@@ -227,11 +238,13 @@ function drawPlot(
       if (done) {
         drawSprite(canvas, art, x, y, style)
         if (plot.building === 'fountain') drawFountainWater(canvas, x, y, tick, isWinter)
+        if (plot.building === 'windmill') drawSails(canvas, x, y, tick, style.flip === true)
+        if (plot.building === 'clocktower') drawClockHand(canvas, x, y, tick, style.flip === true)
         if (isWinter) {
           drawSnowCap(canvas, art, x, y, style.flip === true)
           if (plot.building === 'house') drawSmoke(canvas, x + (style.flip ? 1 : art.width - 3), y, tick)
         }
-        if (look && look.prop !== 'none' && plot.building !== 'well' && plot.building !== 'fountain') {
+        if (look && look.prop !== 'none' && !UNDECORATED.has(plot.building)) {
           const prop = PROP_ART[look.prop]
           drawSprite(canvas, prop, propAt(look, x0, prop), GROUND + 1 - prop.height, style)
         }
@@ -370,6 +383,41 @@ function drawRooster(canvas: Canvas, r: Rooster, camera: number, tick: number, i
   if (isAsleep && r.pose === 'sit') drawZ(canvas, x + 2, y - 1, tick, 7)
 }
 
+/**
+ * A flower bed: dark soil edged with small stones and a tidy row of flowers
+ * in two colours. Fewer in autumn; bare soil under snow in winter.
+ */
+function drawGarden(canvas: Canvas, x0: number, seed: number, index: number, season: Season): void {
+  const GROUND = groundOf(canvas)
+  fillRect(canvas, x0 + 1, GROUND, PLOT - 2, 1, P.soil)
+  setPixel(canvas, x0 + 1, GROUND - 1, P.stoneLight)
+  setPixel(canvas, x0 + PLOT - 2, GROUND - 1, P.stoneLight)
+  if (season === 'winter') {
+    fillRect(canvas, x0 + 2, GROUND, PLOT - 4, 1, P.white)
+    return
+  }
+  const colors = [PETALS[Math.floor(hash01(seed + 91, index) * PETALS.length)]!, PETALS[Math.floor(hash01(seed + 92, index) * PETALS.length)]!]
+  for (let k = 0; k < 4; k++) {
+    if (season === 'autumn' && k % 2 === 1) continue
+    const x = x0 + 2 + k * 2
+    setPixel(canvas, x, GROUND - 1, P.crop)
+    setPixel(canvas, x, GROUND - 2, colors[k % 2]!)
+  }
+}
+
+/** A wooden fence round a field: a post at each end and a rail between. */
+function drawFence(canvas: Canvas, x0: number): void {
+  const GROUND = groundOf(canvas)
+  for (const x of [x0, x0 + PLOT - 1]) for (let dy = 1; dy <= 3; dy++) setPixel(canvas, x, GROUND - dy, P.woodDark)
+  for (let x = x0; x < x0 + PLOT; x++) setPixel(canvas, x, GROUND - 2, P.wood)
+}
+
+/** A stone path in the soil in front of a plot, laid in an even pattern of light and dark stones. */
+function drawPath(canvas: Canvas, x0: number): void {
+  const y = groundOf(canvas) + 1
+  for (let dx = 0; dx < PLOT; dx++) setPixel(canvas, x0 + dx, y, dx % 4 === 3 ? P.stoneDark : dx % 2 === 0 ? P.stoneLight : P.stone)
+}
+
 /** Petal colours a flower may be drawn in, chosen by where it grows. */
 const PETALS: readonly number[] = [P.grain, P.white, 0xf4a6c0, 0x7fa7e0, P.ember]
 
@@ -427,6 +475,35 @@ function drawGroundCover(canvas: Canvas, seed: number, camera: number, season: S
       setPixel(canvas, x, GROUND - 2, PETALS[Math.floor(hash01(seed + 84, wx) * PETALS.length)]!)
     }
   }
+}
+
+/** Buildings that take no barrel or lantern beside them: the well and the landmarks. */
+const UNDECORATED: ReadonlySet<BuildingKind> = new Set(['well', 'fountain', 'windmill', 'library', 'clocktower'])
+
+/** The windmill's four sails, turning slowly about the hub. */
+function drawSails(canvas: Canvas, x: number, y: number, tick: number, flip: boolean): void {
+  const hubX = x + (flip ? WINDMILL.width - 1 - WINDMILL_HUB[0] : WINDMILL_HUB[0]) + 0.5
+  const hubY = y + WINDMILL_HUB[1]
+  const turn = tick / 40
+  for (let arm = 0; arm < 4; arm++) {
+    const angle = turn + (arm * Math.PI) / 2
+    for (let r = 1; r <= 5; r++) {
+      const px = Math.round(hubX + Math.cos(angle) * r)
+      const py = Math.round(hubY + Math.sin(angle) * r)
+      // A wooden spar, with sailcloth on its outer part.
+      setPixel(canvas, px, py, r >= 3 ? P.canvas : P.woodDark)
+    }
+  }
+  setPixel(canvas, Math.round(hubX), hubY, P.woodDark)
+}
+
+/** The hand on the clock face, stepping round once every few seconds. */
+function drawClockHand(canvas: Canvas, x: number, y: number, tick: number, flip: boolean): void {
+  const cx = x + (flip ? CLOCKTOWER.width - 1 - CLOCK_CENTRE[0] : CLOCK_CENTRE[0])
+  const cy = y + CLOCK_CENTRE[1]
+  const ring = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]] as const
+  const [dx, dy] = ring[Math.floor(tick / 12) % ring.length]!
+  setPixel(canvas, cx + dx, cy + dy, P.outline)
 }
 
 const SPRAY = { jet: 0xa9d2f2, drop: 0x5b93cf, ice: 0xdcecf5 } as const
@@ -657,6 +734,9 @@ export function renderFrame(
     const look = plot.kind === 'building' ? lookOf(village, index, plot) : undefined
     if (effect) drawEffect(canvas, effect, plot, x0, tick, season)
     else drawPlot(canvas, plot, x0, village.seed, index, shake, tick, season, look, (scene.doors.get(index) ?? 0) > tick)
+    // The path runs in front of whatever stands on the plot, fields' soil included.
+    if (inside && village.paths.includes(index)) drawPath(canvas, x0)
+    if (inside && plot.kind === 'farm' && village.fences.includes(index)) drawFence(canvas, x0)
     if (plot.kind === 'building' && look && plot.progress >= BUILDINGS[plot.building].steps) {
       const art = BUILDING_ART[plot.building]
       // A home's windows light up only while someone is in.
@@ -666,7 +746,7 @@ export function renderFrame(
         naps.push({ x: x0 + Math.floor((PLOT - art.width) / 2) + (look.mirrored ? 1 : art.width - 5), y: bottomY(canvas, art) - 1, seed: index })
       }
       if (isLit) lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
-      if (look.prop === 'lantern' && plot.building !== 'well' && plot.building !== 'fountain') {
+      if (look.prop === 'lantern' && !UNDECORATED.has(plot.building)) {
         lit.push({ sprite: LANTERN, x: propAt(look, x0, LANTERN), y: GROUND + 1 - LANTERN.height, flip: false })
       }
     }

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.4 - 2026-10-20
+
+- Landmarks: a village grown large enough raises a windmill and a library, and later a clock tower,
+  one of each, paid for mostly with the knowledge it has gathered. The windmill stands out by the
+  fields with its sails turning, the library near the middle with white columns and windows lit
+  after dark, and the clock tower near the middle with a hand going round its face. A landmark is
+  only picked once its knowledge is gathered, so it never holds up the rest of the village. The
+  resources row says how much knowledge the next landmark wants.
+- Once everything is built, the villagers make the village finer, turn by turn and as timber and
+  stone allow: a stone path in front of the village, laid out from the fire; fences round the
+  fields; flower beds on open ground, in two colours, fewer in autumn and under snow in winter. A
+  flower bed makes way if the village later wants the ground for a landmark.
+- Fixed: the tent could be rebuilt as a hut past the cap of three huts.
+
 ## 0.3.3 - 2026-10-20
 
 - Buildings are no longer raised in one fixed order. After its first tent, each village picks its
