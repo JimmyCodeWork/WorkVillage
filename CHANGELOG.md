@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.4 - 2026-10-20
 
 - Landmarks: a village grown large enough raises a windmill and a library, and later a clock tower,
   one of each, paid for mostly with the knowledge it has gathered. The windmill stands out by the
