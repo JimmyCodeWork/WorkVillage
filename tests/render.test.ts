@@ -411,12 +411,35 @@ describe('events', () => {
 })
 
 describe('the rooster', () => {
+  const hamlet = () => {
+    let v = createVillage(8, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 60; i++) v = applySignal(v, signals[i % 5]!).village
+    return v
+  }
+
+  test('it comes once the village is a hamlet, wandering in from the edge', () => {
+    let v = createVillage(8, 0)
+    const scene = createScene(v)
+    expect(scene.hasRooster).toBe(false)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 80 && !scene.hasRooster; i++) {
+      const outcome = applySignal(v, signals[i % 5]!)
+      v = outcome.village
+      stepScene(scene, false)
+      syncScene(scene, v)
+    }
+    expect(scene.hasRooster).toBe(true)
+    // It walks in from out of the way, not out of thin air by the fire.
+    expect(Math.abs(scene.rooster.x - (scene.camp * 12 + 6))).toBeGreaterThan(40)
+  })
+
   const step = (scene: ReturnType<typeof createScene>, ticks: number, isNight: boolean) => {
     for (let i = 0; i < ticks; i++) stepScene(scene, isNight)
   }
 
   test('by day it scratches about near the camp, pecking now and then', () => {
-    const scene = createScene(createVillage(8, 0))
+    const scene = createScene(hamlet())
     const camp = scene.camp * 12 + 6
     const poses = new Set<string>()
     for (let i = 0; i < 2000; i++) {
@@ -429,10 +452,10 @@ describe('the rooster', () => {
   })
 
   test('it sleeps by the fire at night, and dozes in the sun now and then by day', () => {
-    const night = createScene(createVillage(8, 0))
+    const night = createScene(hamlet())
     step(night, 200, true)
     expect(night.rooster.pose).toBe('sit')
-    const day = createScene(createVillage(8, 0))
+    const day = createScene(hamlet())
     setDrowsiness(day, 1)
     let dozed = false
     for (let i = 0; i < 2000 && !dozed; i++) {
@@ -443,7 +466,7 @@ describe('the rooster', () => {
   })
 
   test('it crows when night turns to day, and not when work wakes the village', () => {
-    const scene = createScene(createVillage(8, 0))
+    const scene = createScene(hamlet())
     step(scene, 50, false)
     wake(scene)
     step(scene, 10, false)
@@ -511,5 +534,18 @@ describe('the fountain', () => {
     expect(new Set(frames).size).toBeGreaterThan(1)
     const winter = { ...village, stats: { ...village.stats, actions: 3 * 40 } }
     expect(new Set(renderFrame(winter, scene, 80, { hour: 12 }, { height: 20 }).pixels).has(0xa9d2f2)).toBe(false)
+  })
+})
+
+describe('villagers at rest', () => {
+  test('by day each wanders about near its own home, not all round the fire', () => {
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 300; i++) v = applySignal(v, signals[i % 5]!).village
+    const scene = createScene(v)
+    for (let i = 0; i < 1500; i++) stepScene(scene, false)
+    const resting = scene.walkers.filter(w => w.home !== undefined && w.phase === 'idle')
+    expect(resting.length).toBeGreaterThan(0)
+    for (const w of resting) expect(Math.abs(w.x - (w.home! * 12 + 2))).toBeLessThanOrEqual(30)
   })
 })

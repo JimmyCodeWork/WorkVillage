@@ -15,7 +15,7 @@ export const BUILDINGS: Readonly<Record<BuildingKind, BuildingSpec>> = {
   hut: { cost: { wood: 10, stone: 0 }, steps: 5, housing: 2 },
   well: { cost: { wood: 4, stone: 6 }, steps: 4, housing: 0 },
   storehouse: { cost: { wood: 12, stone: 4 }, steps: 6, housing: 0 },
-  house: { cost: { wood: 14, stone: 8 }, steps: 8, housing: 3 },
+  house: { cost: { wood: 14, stone: 8 }, steps: 8, housing: 2 },
   workshop: { cost: { wood: 16, stone: 10 }, steps: 8, housing: 1 },
   tower: { cost: { wood: 18, stone: 16 }, steps: 10, housing: 1 },
   fountain: { cost: { wood: 4, stone: 20 }, steps: 8, housing: 0 },
@@ -35,7 +35,8 @@ export const BUILD_ORDER: readonly BuildingKind[] = [
   'house',
 ]
 
-export const CAPACITY = { camp: 1 } as const
+/** One villager lives at the camp; past `most`, no more come however many homes there are, so the band never crowds. */
+export const CAPACITY = { camp: 1, most: 20 } as const
 
 export const REWARDS = {
   chopWood: 3,

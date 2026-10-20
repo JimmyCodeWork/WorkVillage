@@ -694,7 +694,7 @@ export function renderFrame(
     if (w.phase === 'idle' && w.x === w.targetX && isDozing(w, tick)) drawSnore(canvas, w, camera, tick)
   }
   for (const nap of naps) drawZ(canvas, nap.x, nap.y, tick, nap.seed)
-  drawRooster(canvas, scene.rooster, camera, tick, sky.stars || (scene.rooster.dozeUntil ?? 0) > tick)
+  if (scene.hasRooster) drawRooster(canvas, scene.rooster, camera, tick, sky.stars || (scene.rooster.dozeUntil ?? 0) > tick)
   drawChips(canvas, scene, camera)
   drawDrift(canvas, season, tick, village.seed, camera)
 

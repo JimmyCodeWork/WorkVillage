@@ -86,6 +86,10 @@ with the work under way, and once a storehouse stands, timber and stone are carr
 
 Buildings are raised in order: Tent, Hut, Well, Storehouse, House, Workshop and Watchtower, and,
 once there are enough of them, a single fountain whose water plays by day and freezes in winter.
+Where each goes depends on what it is: the fountain on the square kept free for it beside the fire,
+the watchtower out on the edge facing the forest, fields on the outskirts, and the rest near the
+fire. At most twenty villagers live in the village, and by day each spends its time near its own
+home.
 Each costs timber and stone and takes several steps of work to finish. When the trees near the
 camp are gone, the clearing extends further into the forest. The sky follows your local time.
 Villagers with a home go to bed after dark, and its windows light up while someone is in; the one
@@ -105,8 +109,9 @@ back later with a sack of finds. Now and then a villager dozes off where it sits
 a nap with a Z drifting over the roof, the more often the longer things stay quiet, while the rest
 carry on. Work wakes whoever is dozing with a start.
 
-The village keeps a rooster. It scratches about the camp by day, pecking at the ground, dozes when
-the village does, sleeps by the fire at night, and crows when night turns to day.
+Once the village is a hamlet, a rooster comes to live there. It scratches about the camp by day,
+pecking at the ground and now and then dozing in the sun, sleeps by the fire at night, and crows
+when night turns to day.
 
 The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
 and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves

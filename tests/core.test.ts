@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { BUILDINGS, SEASON_ACTIONS } from '../src/core/balance'
-import { applySignal, createVillage, isComplete, lampSpots, nextBuilding, pondNear, restore, seasonOf, stageOf, wildPlot, withStyles, type Signal, type Village } from '../src/core/world'
+import { applySignal, createVillage, isComplete, lampSpots, nextBuilding, pondNear, restore, seasonOf, squareOf, stageOf, wildPlot, withStyles, type Signal, type Village } from '../src/core/world'
 
 function run(village: Village, signals: readonly Signal[]): Village {
   return signals.reduce((v, s) => applySignal(v, s).village, village)
@@ -288,3 +288,51 @@ describe('lamps and the fountain', () => {
   })
 })
 
+
+describe('where things are built', () => {
+  const grow = (village: Village, count: number) =>
+    run(village, Array.from({ length: count }, (_, i) => (['edit', 'edit', 'commit', 'task', 'create', 'test'] as const)[i % 6]!))
+
+  test('the square beside the fire is kept for the fountain, which stands in the middle', () => {
+    for (const seed of [3, 21, 40]) {
+      const v = grow(createVillage(seed, 0), 900)
+      const fountain = v.plots.findIndex(p => p.kind === 'building' && p.building === 'fountain')
+      expect(fountain).toBe(squareOf(v))
+      expect(Math.abs(fountain - v.camp)).toBe(1)
+    }
+  })
+
+  test('until then nothing else is built or sown on the square', () => {
+    let v = createVillage(21, 0)
+    for (let i = 0; i < 300; i++) {
+      v = applySignal(v, (['edit', 'commit', 'test', 'create'] as const)[i % 4]!).village
+      const square = v.plots[squareOf(v)]
+      const hasFountain = v.plots.some(p => p.kind === 'building' && p.building === 'fountain')
+      if (!hasFountain) expect(square?.kind === 'farm' || (square?.kind === 'building' && square.building !== 'fountain')).toBe(false)
+    }
+  })
+
+  test('the watchtower goes up on the edge, and fields on the outskirts', () => {
+    const v = grow(createVillage(21, 0), 900)
+    const tower = v.plots.findIndex(p => p.kind === 'building' && p.building === 'tower')
+    const buildings = v.plots.flatMap((p, i) => (p.kind === 'building' ? [Math.abs(i - v.camp)] : []))
+    // Further out than most buildings.
+    expect(buildings.filter(d => d > Math.abs(tower - v.camp)).length).toBeLessThan(buildings.length / 2)
+  })
+
+  test('a new field is broken on the open ground furthest from the fire', () => {
+    const v = createVillage(21, 0)
+    const plots = v.plots.map((p, i) => (i === v.camp ? p : ({ kind: 'grass' } as const)))
+    const outcome = applySignal({ ...v, plots }, 'test')
+    expect(outcome.action?.kind).toBe('plant')
+    const furthest = Math.max(v.camp, plots.length - 1 - v.camp)
+    expect(Math.abs(outcome.action!.plot - v.camp)).toBe(furthest)
+  })
+})
+
+describe('population', () => {
+  test('however many homes there are, no more than twenty live in the village', () => {
+    const v = run(createVillage(21, 0), Array.from({ length: 1500 }, (_, i) => (['edit', 'edit', 'commit', 'task', 'create', 'test'] as const)[i % 6]!))
+    expect(v.villagers).toBe(20)
+  })
+})

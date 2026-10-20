@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Buildings go where they suit: the plot beside the fire is kept free as the village square until
+  the fountain stands there, in the middle of the village; the watchtower goes up on the outer edge
+  facing the forest; new fields are broken on the outskirts; the rest are built near the fire as
+  before. Villages whose square is already taken build the fountain on the nearest open ground.
+- The rooster now comes once the village is a hamlet, wandering in from the edge of the clearing,
+  instead of being there from the first camp.
+- No more than twenty villagers live in a village, and a house now homes two instead of three, so the
+  band never crowds; villagers already living there stay. By day each villager rests and wanders
+  near its own home rather than all round the fire.
 - Street lamps are now built by the villagers rather than appearing on their own. Once the village
   is a hamlet, while timber and stone are saved for the next building, a villager now and then puts
   up a lamp for a little timber and stone, on the same edges as before. Lamps are kept with the

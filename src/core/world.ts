@@ -213,7 +213,7 @@ export function capacity(village: Village): number {
   for (const plot of village.plots) {
     if (plot.kind === 'building' && isComplete(plot)) total += BUILDINGS[plot.building].housing
   }
-  return total
+  return Math.min(total, CAPACITY.most)
 }
 
 /** Plot indices ordered by distance from the camp, nearest first. */
@@ -307,13 +307,40 @@ function chooseLook(village: Village): Look {
   return { roof, prop: pick(kit.props, 41), mirrored: hash01(seed + 43, n) < 0.5 }
 }
 
+/**
+ * The plot beside the fire, on its left, kept open as the village square
+ * until the fountain stands there, so the fountain ends up in the middle.
+ */
+export function squareOf(village: Village): number {
+  return village.camp - 1
+}
+
+/** Open ground for building or fields, nearest the camp first, the square left free until it has its fountain. */
+function openGround(village: Village): number[] {
+  const square = hasFountain(village) ? undefined : squareOf(village)
+  return byDistance(village, p => p.kind === 'grass').filter(i => i !== square)
+}
+
+/**
+ * Where a building goes: the fountain on the square in the middle of the
+ * village, the watchtower out on the edge facing the forest, and the rest
+ * on one of the two clearings nearest the fire.
+ */
+function siteFor(village: Village, kind: BuildingKind): number | undefined {
+  if (kind === 'fountain') {
+    const square = squareOf(village)
+    return village.plots[square]?.kind === 'grass' ? square : byDistance(village, p => p.kind === 'grass')[0]
+  }
+  const open = openGround(village)
+  if (kind === 'tower') return open.at(-1)
+  return open.length > 1 && hash01(village.seed + 29, village.nextBuild) < 0.5 ? open[1] : open[0]
+}
+
 /** Places the next building on open ground if it can be paid for. */
 function placeSite(village: Village): { village: Village; plot?: number } {
   const kind = nextBuilding(village)
   if (!canAfford(village, kind)) return { village }
-  // One of the two nearest clearings, so the village grows out on either side.
-  const open = byDistance(village, p => p.kind === 'grass')
-  const ground = open.length > 1 && hash01(village.seed + 29, village.nextBuild) < 0.5 ? open[1] : open[0]
+  const ground = siteFor(village, kind)
   if (ground === undefined) return { village }
   const cost = BUILDINGS[kind].cost
   let next = gain(village, { wood: -cost.wood, stone: -cost.stone })
@@ -416,7 +443,7 @@ function labour(village: Village, preferStone: boolean, milestones: Milestone[])
   if (stump !== undefined) {
     const before = v.plots[stump]
     // A settled village with no water near digs a pond where the stump was.
-    const digs = builtCount(v) >= WORLD.pondAfterBuilt && pondNear(v) === undefined
+    const digs = builtCount(v) >= WORLD.pondAfterBuilt && pondNear(v) === undefined && stump !== squareOf(v)
     v = gain(withPlot(v, stump, digs ? { kind: 'pond' } : { kind: 'grass' }), { wood: REWARDS.clearWood })
     return { village: v, action: { kind: 'clear', plot: stump, before }, milestones }
   }
@@ -457,7 +484,8 @@ function farming(village: Village, milestones: Milestone[]): Outcome {
   }
   const growing = nearest(v, p => p.kind === 'farm')
   const farms = v.plots.filter(p => p.kind === 'farm').length
-  const ground = nearest(v, p => p.kind === 'grass')
+  // Fields are broken on the outskirts, leaving the middle for buildings.
+  const ground = openGround(v).at(-1)
   if (ground !== undefined && (growing === undefined || farms < Math.ceil(v.villagers / 2))) {
     const before = v.plots[ground]
     v = withPlot(v, ground, { kind: 'farm', growth: 1 })
