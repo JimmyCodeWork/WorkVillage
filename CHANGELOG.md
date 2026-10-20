@@ -1,20 +1,27 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-10-20
 
-- The settings panel can export and import villages. **Copy this village** copies an export code
-  for this project's village, and **Copy a full backup** one for every village on the device; where
-  the clipboard is not available the code is shown to copy by hand. A pasted code is checked and
-  previewed, and changes nothing until it is confirmed; **Undo import** puts back what it replaced.
-- A lifetime record now adds up the work of every project on the device. `/village stats` shows it
-  under the project's own counts. Resetting a village keeps the work it recorded.
 - Villagers see each job through. Felling a tree takes many blows, with chips of wood flying, then
   the tree falls away from the axe and is cut to length; a boulder is struck until it cracks and then
   broken up. Work speeds up while jobs queue, so the scene keeps pace with a busy session.
 - Villagers with nothing to do lend a hand: two fell a tree, up to three raise a building or bring in
   a harvest. A helper carries the timber home, and a villager walking back empty-handed takes the next
   job straight away instead of first returning to the fire. Once a storehouse stands, timber and
-  stone are carried there. At night everyone still gathers by the fire.
+  stone are carried there.
+- Villagers go in and out of their homes. After dark those with a home walk to its door, open it and
+  go in, and its windows light up only while someone is in; the one who keeps the camp stays by the
+  fire. By day they now and then look in at home, and they come out in the morning, or at once when
+  work comes in at night.
+- Ponds and fishing. The wild has ponds in it, frozen over in winter, and a village with none near
+  digs one where it clears a stump once it has a few buildings. In quiet moments a villager goes
+  fishing for a little food: the float bobs, something bites, and the catch is held up, most often a
+  fish. Work never waits on fishing; the line comes in for it.
+- The seasons turn with the work done rather than the calendar, so a year passes in a few hours of
+  work and stands still while nobody works. Spring brings blossom and drifting petals, summer lush
+  grass and fireflies at night, autumn golden fields and falling leaves, and winter snow on the
+  ground and roofs, falling snow and smoke from the chimneys. The row above the village names the
+  season.
 - Every village is its own. Each grows a forest of its own and has a colour of its own; every
   building is given a look when it is placed (its roof colour, which way it faces, and barrels, crates
   or a woodpile beside it), and new buildings go up on either side of the camp. Buildings raised
@@ -22,26 +29,20 @@
 - More styles are found through work on every project on the device: other roof colours, and new
   things to set beside a building. A toast says when one is found, and it can turn up on any
   village's next buildings. `/village stats` and the `/village` pane list the styles found so far
-  and count those still to find, without saying how; they are left for work to turn up. On a device with villages already,
-  the lifetime record starts from their work, so styles that work has earned are found at once.
-- The seasons turn with the work done rather than the calendar, so a year passes in a few hours of
-  work and stands still while nobody works. Spring brings blossom and drifting petals, summer lush
-  grass and fireflies at night, autumn golden fields and falling leaves, and winter snow on the
-  ground and roofs, falling snow and smoke from the chimneys. The row above the village names the
-  season.
-- Villagers go in and out of their homes. After dark those with a home walk to its door, open it and
-  go in, and its windows light up only while someone is in; the one who keeps the camp stays by the
-  fire. By day they now and then look in at home, and they come out in the morning, or at once when
-  work comes in at night.
-- Ponds and fishing. The wild has ponds in it, frozen over in winter, and a village with none near
-  digs one where it clears a stump once it has a few buildings. In quiet moments a villager goes
-  fishing for a little food: the float bobs, something bites, and the
-  catch is held up, most often a fish. Work never waits on fishing; the line comes in for it.
-- The README no longer lists which kind of work does what; it describes the village growing with
-  the work as a whole, so nothing invites doing work for the village's sake.
-- Fixed: when the clearing grew on the left, jobs already waiting could be worked on the wrong plot.
+  and count those still to find, without saying how; they are left for work to turn up.
+- A lifetime record now adds up the work of every project on the device. `/village stats` shows it
+  under the project's own counts, and resetting a village keeps the work it recorded. On a device
+  with villages already, the record starts from their work, so styles that work has earned are found
+  at once.
+- The settings panel can export and import villages. **Copy this village** copies an export code
+  for this project's village, and **Copy a full backup** one for every village on the device; where
+  the clipboard is not available the code is shown to copy by hand. A pasted code is checked and
+  previewed, and changes nothing until it is confirmed; **Undo import** puts back what it replaced.
+- The README describes the village growing with the work as a whole instead of listing which kind of
+  work does what, so nothing invites doing work for the village's sake.
 - Saved villages are now checked field by field when they load, so a damaged save or a malformed
   code is refused instead of drawn.
+- Fixed: when the clearing grew on the left, jobs already waiting could be worked on the wrong plot.
 
 ## 0.2.8 - 2026-10-15
 
