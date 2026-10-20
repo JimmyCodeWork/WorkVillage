@@ -336,9 +336,14 @@ function drawBugs(canvas: Canvas, scene: Scene, camera: number): void {
 /** A Z drifting up from a dozing villager's head, one after another. */
 function drawSnore(canvas: Canvas, w: Walker, camera: number, tick: number): void {
   const GROUND = groundOf(canvas)
-  const rise = (Math.floor(tick / 6) + w.id * 3) % 6
-  const x = Math.round(w.x - camera) + (w.facingLeft ? 1 : 5) + Math.floor(rise / 3)
-  const y = GROUND + 2 - VILLAGER_HEIGHT - 1 - rise
+  drawZ(canvas, Math.round(w.x - camera) + (w.facingLeft ? 1 : 5), GROUND + 2 - VILLAGER_HEIGHT - 1, tick, w.id)
+}
+
+/** A Z rising from (x, y), the top of whoever is asleep there. */
+function drawZ(canvas: Canvas, x0: number, y0: number, tick: number, seed: number): void {
+  const rise = (Math.floor(tick / 6) + seed * 3) % 6
+  const x = x0 + Math.floor(rise / 3)
+  const y = y0 - rise
   // A Z needs four pixels a side for its diagonal to read as one.
   for (const [dx, dy] of [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3], [3, 3]] as const) {
     setPixel(canvas, x + dx, y + dy - 3, P.white)
@@ -538,6 +543,7 @@ export function renderFrame(
   const last = Math.ceil((camera + width) / PLOT) + 1
   const lit: { sprite: Sprite; x: number; y: number; flip: boolean }[] = []
   const homes = occupied(scene)
+  const naps: { x: number; y: number; seed: number }[] = []
   for (let index = first; index <= last; index++) {
     const inside = index >= 0 && index < village.plots.length
     const plot = inside ? (scene.holds.get(index) ?? village.plots[index]!) : wildPlot(village.seed, index - village.camp)
@@ -551,6 +557,10 @@ export function renderFrame(
       const art = BUILDING_ART[plot.building]
       // A home's windows light up only while someone is in.
       const isLit = BUILDINGS[plot.building].housing === 0 || homes.has(index)
+      // Someone napping inside snores over the roof.
+      if (scene.isDozing && homes.has(index)) {
+        naps.push({ x: x0 + Math.floor((PLOT - art.width) / 2) + (look.mirrored ? 1 : art.width - 5), y: bottomY(canvas, art) - 1, seed: index })
+      }
       if (isLit) lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
       if (look.prop === 'lantern' && plot.building !== 'well') {
         lit.push({ sprite: LANTERN, x: propAt(look, x0, LANTERN), y: GROUND + 1 - LANTERN.height, flip: false })
@@ -569,6 +579,7 @@ export function renderFrame(
     drawFishing(canvas, w, camera, tick)
     if (scene.isDozing && w.phase === 'idle' && w.x === w.targetX) drawSnore(canvas, w, camera, tick)
   }
+  for (const nap of naps) drawZ(canvas, nap.x, nap.y, tick, nap.seed)
   if (scene.wokeAt !== undefined && tick - scene.wokeAt < WAKE_TICKS) drawRooster(canvas, fireX + 8, tick, scene.wokeAt)
   drawChips(canvas, scene, camera)
   drawDrift(canvas, season, tick, village.seed, camera)

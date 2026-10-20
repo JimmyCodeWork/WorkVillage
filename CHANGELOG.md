@@ -7,8 +7,9 @@
     little knowledge. Nothing is ever lost to a bug.
   - A villager may set out on an errand, walk out of sight and come back later with a sack of timber
     and stone, or empty-handed if the errand came to nothing.
-  - After a long quiet the villagers doze off where they rest, with a Z drifting up now and then,
-    until the next work wakes the village: a rooster crows by the fire and everyone springs up.
+  - After a long quiet the villagers go home for a nap, with a Z drifting up over the roof, while
+    the one who keeps the camp dozes by the fire. The next work wakes the village: a rooster crows by
+    the fire, the nappers come out and everyone springs up. After dark they sleep on.
 
 ## 0.3.0 - 2026-10-20
 

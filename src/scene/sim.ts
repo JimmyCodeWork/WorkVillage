@@ -43,6 +43,8 @@ export type Walker = {
   carry?: 'log' | 'stone' | 'sack'
   /** When a scout out on an errand comes back with nothing, at the latest. */
   awayUntil?: number
+  /** Gone home for a nap in a long quiet, to come out when work wakes the village. */
+  isNapping?: boolean
   restUntil: number
   hop: number
   /** The villager whose job this one is lending a hand with. */
@@ -506,6 +508,7 @@ export function sendScout(scene: Scene): void {
     .find((w, i, all) => i < all.length - 1 && (w.phase === 'idle' || w.phase === 'inside') && w.helping === undefined)
   if (!scout) return
   if (scout.phase === 'inside') leaveHome(scene, scout)
+  scout.isNapping = false
   const side = scene.rand() < 0.5 ? -1 : 1
   scout.phase = 'scouting'
   scout.targetX = campX(scene) + side * SCOUT_RANGE
@@ -529,7 +532,15 @@ export function hasScoutOut(scene: Scene): boolean {
 
 /** Long quiet sends the village dozing; the next work wakes it with a crow. */
 export function setDozing(scene: Scene, isDozing: boolean): void {
-  if (scene.isDozing && !isDozing) scene.wokeAt = scene.tick
+  if (scene.isDozing && !isDozing) {
+    scene.wokeAt = scene.tick
+    // Those napping at home come out at the crow; after dark they sleep on.
+    for (const w of scene.walkers) {
+      if (!w.isNapping) continue
+      w.isNapping = false
+      w.restUntil = scene.tick
+    }
+  }
   scene.isDozing = isDozing
 }
 
@@ -570,6 +581,7 @@ export function stepScene(scene: Scene, isNight: boolean): void {
     // A job never waits on fishing: another villager free goes first, else the line comes in.
     if (walker.action?.kind === 'fish' && scene.walkers.some(w => w !== walker && isFree(w) && w.action?.kind !== 'fish')) continue
     if (walker.phase === 'inside') leaveHome(scene, walker)
+    walker.isNapping = false
     walker.caught = undefined
     const action = scene.queue.shift()!
     walker.action = action
@@ -644,8 +656,8 @@ export function stepScene(scene: Scene, isNight: boolean): void {
         }
         break
       case 'inside':
-        // Out again in the morning, or after a short visit by day.
-        if (!isNight && tick >= walker.restUntil) leaveHome(scene, walker)
+        // Out again in the morning, or after a short visit by day; a nap lasts until the village wakes.
+        if (!isNight && !walker.isNapping && tick >= walker.restUntil) leaveHome(scene, walker)
         break
       case 'scouting':
         if (walk(walker, tick)) walker.phase = 'away'
@@ -677,7 +689,13 @@ export function stepScene(scene: Scene, isNight: boolean): void {
           break
         }
         if (scene.isDozing) {
-          // Nothing to do for a long while: a doze where they rest.
+          // Nothing to do for a long while: those with a home go in for a nap, the rest doze where they rest.
+          if (walker.home !== undefined) {
+            walker.isNapping = true
+            walker.phase = 'goingIn'
+            walker.targetX = doorX(walker.home)
+            break
+          }
           walker.pose = 'sit'
           break
         }

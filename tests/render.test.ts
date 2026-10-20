@@ -331,6 +331,38 @@ describe('events', () => {
     expect(alone.walkers[0]!.phase).not.toBe('scouting')
   })
 
+  test('in a long quiet those with a home go in to nap, and come out when work wakes the village', () => {
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 150; i++) v = applySignal(v, signals[i % signals.length]!).village
+    const scene = createScene(v)
+    run(scene, 100)
+    setDozing(scene, true)
+    run(scene, 400)
+    // The one who keeps the camp dozes by the fire; everyone else is home asleep.
+    expect(scene.walkers[0]!.phase).toBe('idle')
+    expect(scene.walkers[0]!.pose).toBe('sit')
+    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
+    // A nap is not a short visit: it lasts as long as the quiet does.
+    run(scene, 400)
+    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
+    setDozing(scene, false)
+    run(scene, 2)
+    expect(scene.walkers.filter(w => w.phase === 'inside').length).toBe(0)
+  })
+
+  test('woken after dark, the nappers sleep on', () => {
+    let v = createVillage(21, 0)
+    const signals = ['edit', 'edit', 'commit', 'task', 'create'] as const
+    for (let i = 0; i < 150; i++) v = applySignal(v, signals[i % signals.length]!).village
+    const scene = createScene(v)
+    setDozing(scene, true)
+    for (let i = 0; i < 400; i++) stepScene(scene, true)
+    setDozing(scene, false)
+    for (let i = 0; i < 20; i++) stepScene(scene, true)
+    expect(scene.walkers.slice(1).every(w => w.phase === 'inside')).toBe(true)
+  })
+
   test('a long quiet sets the village dozing; work wakes it with a start', () => {
     const scene = createScene(village(3))
     run(scene, 200)
