@@ -59,8 +59,10 @@ comes in when there is a job to do.
 Now and then something else happens in the village. A bug may crawl out of the forest and scuttle
 about until the villagers catch it. A villager may set out on an errand, walk out of sight and come
 back later with a sack of finds. After a long quiet the villagers go home for a nap, snoring over
-the roof, while the one who keeps the camp dozes by the fire, until a rooster crows the village
-awake.
+the roof, while the one who keeps the camp dozes by the fire, until work wakes the village.
+
+The village keeps a rooster. It scratches about the camp by day, pecking at the ground, dozes when
+the village does, sleeps by the fire at night, and crows when night turns to day.
 
 The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
 and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves

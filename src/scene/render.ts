@@ -39,7 +39,7 @@ import { BUILDINGS } from '../core/balance'
 import { hash01, seasonOf, wildPlot, type Look, type Plot, type Season, type Village } from '../core/world'
 import { invertMonochrome, isMono, toGrayscale, toMonochrome, type Palette } from '../pixel/filter'
 import { CLEAR, createCanvas, drawSprite, fillRect, mix, setPixel, type Canvas, type Sprite } from '../pixel/canvas'
-import { FALL_TICKS, isWorked, occupied, plotCenter, PLOT, WAKE_TICKS, type Catch, type Chip, type Effect, type Scene, type Walker } from './sim'
+import { FALL_TICKS, isWorked, occupied, plotCenter, PLOT, type Catch, type Chip, type Effect, type Rooster, type Scene, type Walker } from './sim'
 
 /** Scene heights in pixels; a terminal row holds two. */
 export const SCENE_HEIGHTS = { small: 14, medium: 20 } as const
@@ -350,17 +350,22 @@ function drawZ(canvas: Canvas, x0: number, y0: number, tick: number, seed: numbe
   }
 }
 
-/** The rooster by the fire, crowing the village awake. */
-function drawRooster(canvas: Canvas, x: number, tick: number, wokeAt: number): void {
+/** The village rooster where it is: scratching about, asleep by the fire, or crowing at dawn. */
+function drawRooster(canvas: Canvas, r: Rooster, camera: number, tick: number, isAsleep: boolean): void {
   const GROUND = groundOf(canvas)
-  const y = GROUND + 1 - ROOSTER.height
-  drawSprite(canvas, ROOSTER, x, y)
-  // The crow, in short strokes from the beak.
-  if (Math.floor((tick - wokeAt) / 4) % 2 === 0) {
-    setPixel(canvas, x + 6, y, P.white)
-    setPixel(canvas, x + 7, y - 1, P.white)
-    setPixel(canvas, x + 6, y + 2, P.white)
+  const art = ROOSTER[r.pose]
+  const x = Math.round(r.x - camera)
+  const y = GROUND + 1 - art.height
+  drawSprite(canvas, art, x, y, { flip: r.facingLeft })
+  const beak = r.facingLeft ? x - 1 : x + art.width
+  if (r.pose === 'crow') {
+    // The crow, in short strokes from the beak.
+    const out = r.facingLeft ? -1 : 1
+    setPixel(canvas, beak + out, y, P.white)
+    setPixel(canvas, beak + out * 2, y - 1, P.white)
+    setPixel(canvas, beak + out, y + 2, P.white)
   }
+  if (isAsleep && r.pose === 'sit') drawZ(canvas, x + 2, y - 1, tick, 7)
 }
 
 /** Snow on whatever is uppermost in each column of a sprite. */
@@ -580,7 +585,7 @@ export function renderFrame(
     if (scene.isDozing && w.phase === 'idle' && w.x === w.targetX) drawSnore(canvas, w, camera, tick)
   }
   for (const nap of naps) drawZ(canvas, nap.x, nap.y, tick, nap.seed)
-  if (scene.wokeAt !== undefined && tick - scene.wokeAt < WAKE_TICKS) drawRooster(canvas, fireX + 8, tick, scene.wokeAt)
+  drawRooster(canvas, scene.rooster, camera, tick, scene.isDozing || sky.stars)
   drawChips(canvas, scene, camera)
   drawDrift(canvas, season, tick, village.seed, camera)
 

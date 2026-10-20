@@ -21,6 +21,16 @@ type Phase = 'idle' | 'toWork' | 'working' | 'returning' | 'arriving' | 'goingIn
 export type JobKind = ActionKind | 'catch'
 export type Job = { kind: JobKind; plot: number; before?: Plot; bug?: number }
 
+/** The village rooster: about the camp by day, asleep by the fire at night, crowing at dawn. */
+export type Rooster = {
+  x: number
+  targetX: number
+  facingLeft: boolean
+  pose: 'walk1' | 'walk2' | 'stand' | 'peck' | 'sit' | 'crow'
+  restUntil: number
+  crowUntil: number
+}
+
 /** A bug let loose by a failed test run, crawling about until the tests pass and it is caught. */
 export type Bug = { id: number; x: number; dir: 1 | -1; isCaught: boolean }
 
@@ -85,8 +95,11 @@ export type Scene = {
   bugs: Bug[]
   /** Nothing has happened for a while: the villagers doze where they rest. */
   isDozing: boolean
-  /** When work woke the village from a doze, for the rooster and the start. */
+  /** When work woke the village from a doze, for the villagers' start. */
   wokeAt?: number
+  rooster: Rooster
+  /** Whether it was night at the last step, to catch the dawn. */
+  wasNight?: boolean
   nextId: number
   rand: () => number
 }
@@ -147,8 +160,10 @@ export const MAX_BUGS = 3
 const SCOUT_RANGE = 160
 /** A scout whose errand never ends comes back empty-handed after this many ticks. */
 const SCOUT_TIMEOUT = 4800
-/** Ticks the village takes to wake: the rooster crows, the villagers spring up. */
+/** Ticks the village takes to wake from a doze: the villagers spring up. */
 export const WAKE_TICKS = 24
+/** How long the rooster crows when night turns to day. */
+export const CROW_TICKS = 40
 
 /** Offset from a villager's box to its feet, for standing beside a plot. */
 const REACH = 9
@@ -166,10 +181,12 @@ export function createScene(village: Village, seed = village.seed): Scene {
     doors: new Map(),
     bugs: [],
     isDozing: false,
+    rooster: { x: 0, targetX: 0, facingLeft: false, pose: 'stand', restUntil: 0, crowUntil: 0 },
     nextId: 1,
     rand: random(seed ^ 0x5eed),
   }
   syncScene(scene, village)
+  scene.rooster.x = scene.rooster.targetX = campX(scene) + 12
   return scene
 }
 
@@ -220,6 +237,8 @@ export function syncScene(scene: Scene, village: Village): void {
     for (const w of scene.walkers) if (w.action) w.action = move(w.action)
     for (const chip of scene.chips) chip.x += shift * PLOT
     for (const bug of scene.bugs) bug.x += shift * PLOT
+    scene.rooster.x += shift * PLOT
+    scene.rooster.targetX += shift * PLOT
     scene.holds = shifted(scene.holds, shift)
     scene.effects = shifted(scene.effects, shift)
     scene.doors = shifted(scene.doors, shift)
@@ -557,6 +576,43 @@ function stepBugs(scene: Scene): void {
   }
 }
 
+/**
+ * The rooster scratches about near the camp by day, pecking at the ground.
+ * At night, or while the village dozes, it settles by the fire; when night
+ * turns to day it crows.
+ */
+function stepRooster(scene: Scene, isNight: boolean): void {
+  const r = scene.rooster
+  const tick = scene.tick
+  if (scene.wasNight === true && !isNight) r.crowUntil = tick + CROW_TICKS
+  scene.wasNight = isNight
+  if (tick < r.crowUntil) {
+    r.pose = Math.floor(tick / 6) % 2 === 0 ? 'crow' : 'stand'
+    return
+  }
+  if (isNight || scene.isDozing) r.targetX = campX(scene) + 10
+  if (Math.abs(r.targetX - r.x) >= 1) {
+    // A short-legged gait: half a villager's pace.
+    if (tick % 2 === 0) {
+      r.facingLeft = r.targetX < r.x
+      r.x += Math.sign(r.targetX - r.x)
+    }
+    r.pose = Math.floor(tick / 2) % 2 === 0 ? 'walk1' : 'walk2'
+    return
+  }
+  if (isNight || scene.isDozing) {
+    r.pose = 'sit'
+    return
+  }
+  if (tick < r.restUntil) {
+    if (tick % 8 === 0) r.pose = scene.rand() < 0.5 ? 'peck' : 'stand'
+    return
+  }
+  const side = scene.rand() < 0.5 ? -1 : 1
+  r.targetX = Math.round(campX(scene) + side * (8 + scene.rand() * 32))
+  r.restUntil = tick + 20 + Math.floor(scene.rand() * 40)
+}
+
 function stepChips(scene: Scene): void {
   for (const chip of scene.chips) {
     chip.x += chip.vx
@@ -573,6 +629,7 @@ export function stepScene(scene: Scene, isNight: boolean): void {
   const tick = scene.tick
   stepChips(scene)
   stepBugs(scene)
+  stepRooster(scene, isNight)
   const isWaking = scene.wokeAt !== undefined && tick - scene.wokeAt < WAKE_TICKS
 
   for (const walker of scene.walkers) {
@@ -732,6 +789,7 @@ export function isBusy(scene: Scene): boolean {
     scene.chips.length > 0 ||
     scene.bugs.length > 0 ||
     (scene.wokeAt !== undefined && scene.tick - scene.wokeAt < WAKE_TICKS) ||
+    scene.tick < scene.rooster.crowUntil ||
     scene.walkers.some(w => (w.phase !== 'idle' && w.phase !== 'inside' && w.phase !== 'away') || w.x !== w.targetX)
   )
 }

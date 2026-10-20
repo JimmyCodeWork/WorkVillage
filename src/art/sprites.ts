@@ -300,8 +300,15 @@ export const CAUGHT_FISH = s(['.QQq.', 'QQQQq', '.QQq.'])
 export const CAUGHT_BOOT = s(['dd.', 'dd.', 'ddd'])
 export const CAUGHT_CHEST = s(['wWWw', 'dzzd', 'dddd'])
 
-/** The rooster that crows the village awake after a doze. */
-export const ROOSTER = s(['..x..', '..uuF', 'uuuu.', '.uuu.', '..j..'])
+/** The village rooster, facing right: walking, pecking, sitting and crowing at dawn. */
+export const ROOSTER: Readonly<Record<'walk1' | 'walk2' | 'stand' | 'peck' | 'sit' | 'crow', Sprite>> = {
+  stand: s(['...x.', 'u..uF', 'uuuu.', '.uuu.', '.j.j.']),
+  walk1: s(['...x.', 'u..uF', 'uuuu.', '.uuu.', 'j...j']),
+  walk2: s(['...x.', 'u..uF', 'uuuu.', '.uuu.', '..j..']),
+  peck: s(['.....', 'u....', 'uuux.', '.uuuu', '.j.jF']),
+  sit: s(['...x.', 'u..uF', 'uuuu.', '.uuu.']),
+  crow: s(['....x', 'u..uF', 'u.uu.', 'uuuu.', '.uuu.', '.j.j.']),
+}
 
 export const FLOWER = s(['z', 'e'])
 export const TUFT = s(['m.m', '.m.'])

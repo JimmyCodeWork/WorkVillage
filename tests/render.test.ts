@@ -4,7 +4,7 @@ import { applySignal, createVillage } from '../src/core/world'
 import { toBase64, toRasterCells, toSvg } from '../src/pixel/encode'
 import { MONO_INK, MONO_PAPER } from '../src/pixel/filter'
 import { renderFrame, SCENE_HEIGHTS } from '../src/scene/render'
-import { catchBugs, createScene, enqueue, MAX_BUGS, releaseBug, scoutReturns, sendScout, setDozing, stepScene, syncScene } from '../src/scene/sim'
+import { catchBugs, createScene, CROW_TICKS, enqueue, MAX_BUGS, releaseBug, scoutReturns, sendScout, setDozing, stepScene, syncScene } from '../src/scene/sim'
 
 describe('render', () => {
   test('base64 matches the standard alphabet and padding', () => {
@@ -375,5 +375,49 @@ describe('events', () => {
     expect(scene.wokeAt).toBe(scene.tick)
     run(scene, 1)
     expect(scene.walkers.some(w => w.hop !== 0)).toBe(true)
+  })
+})
+
+describe('the rooster', () => {
+  const step = (scene: ReturnType<typeof createScene>, ticks: number, isNight: boolean) => {
+    for (let i = 0; i < ticks; i++) stepScene(scene, isNight)
+  }
+
+  test('by day it scratches about near the camp, pecking now and then', () => {
+    const scene = createScene(createVillage(8, 0))
+    const camp = scene.camp * 12 + 6
+    const poses = new Set<string>()
+    for (let i = 0; i < 600; i++) {
+      stepScene(scene, false)
+      poses.add(scene.rooster.pose)
+      expect(Math.abs(scene.rooster.x - camp)).toBeLessThanOrEqual(42)
+    }
+    expect([...poses]).toEqual(expect.arrayContaining(['walk1', 'peck']))
+    expect(poses.has('crow')).toBe(false)
+  })
+
+  test('it sleeps by the fire at night and in a long quiet', () => {
+    const night = createScene(createVillage(8, 0))
+    step(night, 200, true)
+    expect(night.rooster.pose).toBe('sit')
+    const quiet = createScene(createVillage(8, 0))
+    step(quiet, 20, false)
+    setDozing(quiet, true)
+    step(quiet, 200, false)
+    expect(quiet.rooster.pose).toBe('sit')
+  })
+
+  test('it crows when night turns to day, and not when the village wakes from a doze', () => {
+    const scene = createScene(createVillage(8, 0))
+    step(scene, 50, false)
+    setDozing(scene, true)
+    step(scene, 50, false)
+    setDozing(scene, false)
+    step(scene, 10, false)
+    expect(scene.tick).toBeGreaterThan(scene.rooster.crowUntil)
+    step(scene, 50, true)
+    step(scene, 1, false)
+    expect(scene.rooster.crowUntil).toBe(scene.tick + CROW_TICKS)
+    expect(['crow', 'stand']).toContain(scene.rooster.pose)
   })
 })
