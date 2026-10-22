@@ -113,13 +113,10 @@ comes in when there is a job to do.
 
 Now and then something else happens in the village. A bug may crawl out of the forest and scuttle
 about until the villagers catch it. A villager may set out on an errand, walk out of sight and come
-back later with a sack of finds. Now and then a villager dozes off where it sits, or goes home for
-a nap with a Z drifting over the roof, the more often the longer things stay quiet, while the rest
-carry on. Work wakes whoever is dozing with a start.
+back later with a sack of finds.
 
 Once the village is a hamlet, a rooster comes to live there. It scratches about the camp by day,
-pecking at the ground and now and then dozing in the sun, sleeps by the fire at night, and crows
-when night turns to day.
+pecking at the ground, sleeps by the fire at night, and crows when night turns to day.
 
 The seasons turn with your work rather than the calendar, so a year passes in a few hours of work
 and stands still while you are away: blossom in spring, fireflies on summer nights, falling leaves

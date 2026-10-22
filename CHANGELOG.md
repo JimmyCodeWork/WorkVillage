@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Villagers sleep only at night. The daytime dozes and naps at home are gone, however long things
+  stay quiet, and so is the rooster's doze in the sun. At night villagers still go to bed, one now
+  and then gets up for a walk, and whoever keeps the fire may nod off by it until work comes in.
+
 ## 0.3.4 - 2026-10-20
 
 - Landmarks: a village grown large enough raises a windmill and a library, and later a clock tower,

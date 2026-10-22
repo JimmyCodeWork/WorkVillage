@@ -723,7 +723,6 @@ export function renderFrame(
   const last = Math.ceil((camera + width) / PLOT) + 1
   const lit: { sprite: Sprite; x: number; y: number; flip: boolean }[] = []
   const homes = occupied(scene)
-  const sleepers = new Set(scene.walkers.flatMap(w => (w.phase === 'inside' && w.isNapping && w.home !== undefined ? [w.home] : [])))
   const naps: { x: number; y: number; seed: number }[] = []
   for (let index = first; index <= last; index++) {
     const inside = index >= 0 && index < village.plots.length
@@ -741,8 +740,8 @@ export function renderFrame(
       const art = BUILDING_ART[plot.building]
       // A home's windows light up only while someone is in.
       const isLit = BUILDINGS[plot.building].housing === 0 || homes.has(index)
-      // Someone asleep inside, napping by day or in bed at night, snores over the roof.
-      if (sleepers.has(index) || (sky.stars && homes.has(index))) {
+      // Someone in bed for the night snores over the roof.
+      if (sky.stars && homes.has(index)) {
         naps.push({ x: x0 + Math.floor((PLOT - art.width) / 2) + (look.mirrored ? 1 : art.width - 5), y: bottomY(canvas, art) - 1, seed: index })
       }
       if (isLit) lit.push({ sprite: art, x: x0 + Math.floor((PLOT - art.width) / 2), y: bottomY(canvas, art), flip: look.mirrored })
@@ -774,7 +773,7 @@ export function renderFrame(
     if (w.phase === 'idle' && w.x === w.targetX && isDozing(w, tick)) drawSnore(canvas, w, camera, tick)
   }
   for (const nap of naps) drawZ(canvas, nap.x, nap.y, tick, nap.seed)
-  if (scene.hasRooster) drawRooster(canvas, scene.rooster, camera, tick, sky.stars || (scene.rooster.dozeUntil ?? 0) > tick)
+  if (scene.hasRooster) drawRooster(canvas, scene.rooster, camera, tick, sky.stars)
   drawChips(canvas, scene, camera)
   drawDrift(canvas, season, tick, village.seed, camera)
 
