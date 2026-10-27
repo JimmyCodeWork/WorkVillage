@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.5 - 2026-10-27
 
 - The README's steps for installing and updating in the desktop app follow the app's own menus:
   Customize, Plugins, Add, then Add marketplace to install, or Manage marketplaces and Check for
