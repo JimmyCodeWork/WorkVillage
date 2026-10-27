@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.5 - 2026-10-27
+
+- The README's steps for installing and updating in the desktop app follow the app's own menus:
+  Customize, Plugins, Add, then Add marketplace to install, or Manage marketplaces and Check for
+  updates to update, then the plugin under Yours.
+- Villagers sleep only at night. The daytime dozes and naps at home are gone, however long things
+  stay quiet, and so is the rooster's doze in the sun. At night villagers still go to bed, one now
+  and then gets up for a walk, and whoever keeps the fire may nod off by it until work comes in.
+
 ## 0.3.4 - 2026-10-20
 
 - Landmarks: a village grown large enough raises a windmill and a library, and later a clock tower,

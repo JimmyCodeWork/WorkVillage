@@ -44,7 +44,6 @@ import {
   releaseBug,
   scoutReturns,
   sendScout,
-  setDrowsiness,
   stepScene,
   syncScene,
   wake,
@@ -64,10 +63,6 @@ const MAX_RASTER_COLUMNS = 512
 const MAX_IMAGE_COLUMNS = 255
 /** Widest vector scene, in scene pixels; past it the scene is centred. */
 const MAX_VECTOR_WIDTH = 640
-/** After this long without work the villagers grow drowsy, and dozes come oftener... */
-const DROWSY_AFTER_MS = 60_000
-/** ...until, this long after that, they are as drowsy as they get. */
-const DROWSY_OVER_MS = 4 * 60_000
 /** Roughly how many CSS pixels one column of a vector surface is. */
 const VECTOR_CELL_PX = 8
 
@@ -164,8 +159,6 @@ type Runtime = {
   isPointerOnSettings: boolean
   /** Surfaces where the Settings button's Client failed; a plain Button stands in. */
   clientFaults: Set<string>
-  /** When anything last happened in the session, for dozing. */
-  lastActivity: number
 }
 
 // The module's own state: rebuilt from $.store at each session.start, so a
@@ -192,7 +185,6 @@ const rt: Runtime = {
   isSettingsOpen: false,
   isPointerOnSettings: false,
   clientFaults: new Set(),
-  lastActivity: Date.now(),
 }
 
 function summary(): string {
@@ -348,9 +340,8 @@ function adopt(village: Village): void {
   rt.scene = createScene(village)
 }
 
-/** Something happened: the village wakes if it was dozing. */
+/** Something happened: whoever is nodding off by the fire wakes. */
 function stir(): void {
-  rt.lastActivity = Date.now()
   wake(rt.scene)
 }
 
@@ -397,7 +388,6 @@ function rasterCells(canvas: ReturnType<typeof frame>): string {
 
 function tick($: EngineInterface): void {
   const hour = localHour()
-  setDrowsiness(rt.scene, (Date.now() - rt.lastActivity - DROWSY_AFTER_MS) / DROWSY_OVER_MS)
   stepScene(rt.scene, isNightHour(hour))
   let hasVector = false
   for (const [requestId, mount] of rt.mounts) {

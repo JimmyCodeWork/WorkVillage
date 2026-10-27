@@ -29,8 +29,6 @@ export type Rooster = {
   pose: 'walk1' | 'walk2' | 'stand' | 'peck' | 'sit' | 'crow'
   restUntil: number
   crowUntil: number
-  /** Dozing in the sun until this tick. */
-  dozeUntil?: number
 }
 
 /** A bug let loose by a failed test run, crawling about until the tests pass and it is caught. */
@@ -55,10 +53,8 @@ export type Walker = {
   carry?: 'log' | 'stone' | 'sack'
   /** When a scout out on an errand comes back with nothing, at the latest. */
   awayUntil?: number
-  /** Dozing off where it rests, or napping at home, until this tick. */
+  /** Nodding off by the fire at night, until this tick. */
   dozeUntil?: number
-  /** Gone home for a nap by day, rather than for the night. */
-  isNapping?: boolean
   /** Up for a walk in the night, until this tick, before going back to bed. */
   strollUntil?: number
   /** When work startled this villager out of a doze, for the start it gives. */
@@ -101,8 +97,6 @@ export type Scene = {
   /** Doors standing open, by plot, until the tick given. */
   doors: Map<number, number>
   bugs: Bug[]
-  /** How drowsy a long quiet has made the village, 0 to 1: the more, the likelier a doze. */
-  drowsiness: number
   rooster: Rooster
   /** Whether the village keeps a rooster yet: one comes once it is a hamlet. */
   hasRooster: boolean
@@ -172,10 +166,6 @@ const SCOUT_RANGE = 160
 const SCOUT_TIMEOUT = 4800
 /** Ticks a villager startled out of a doze takes to settle. */
 export const WAKE_TICKS = 24
-/** Share of the villagers that may be dozing or napping at once by day; the rest stay up. */
-const MAX_DOZING = 0.5
-/** Chance of a doze each time a villager at rest picks what to do next, alert and at full drowsiness. */
-const DOZE_CHANCE = { alert: 0.03, drowsy: 0.28 } as const
 /** Chance a villager in bed gets up for a walk in the night, each time it stirs. */
 const STROLL_CHANCE = 0.15
 /** Share of the villagers that may be up and about at once in the night. */
@@ -200,7 +190,6 @@ export function createScene(village: Village, seed = village.seed): Scene {
     beds: [],
     doors: new Map(),
     bugs: [],
-    drowsiness: 0,
     lamps: [],
     hasRooster: false,
     rooster: { x: 0, targetX: 0, facingLeft: false, pose: 'stand', restUntil: 0, crowUntil: 0 },
@@ -566,7 +555,6 @@ export function sendScout(scene: Scene): void {
     .find((w, i, all) => i < all.length - 1 && (w.phase === 'idle' || w.phase === 'inside') && w.helping === undefined)
   if (!scout) return
   if (scout.phase === 'inside') leaveHome(scene, scout)
-  scout.isNapping = false
   scout.dozeUntil = undefined
   const side = scene.rand() < 0.5 ? -1 : 1
   scout.phase = 'scouting'
@@ -589,49 +577,17 @@ export function hasScoutOut(scene: Scene): boolean {
   return scene.walkers.some(w => w.phase === 'scouting' || w.phase === 'away')
 }
 
-/** How drowsy the quiet has made the village: dozes come oftener the longer nothing happens. */
-export function setDrowsiness(scene: Scene, drowsiness: number): void {
-  scene.drowsiness = Math.max(0, Math.min(1, drowsiness))
-}
-
-/**
- * Work comes in: whoever is dozing wakes with a start, and those napping at
- * home by day come out. Those in bed for the night sleep on.
- */
+/** Work comes in at night: whoever is nodding off by the fire wakes with a start. Those in bed sleep on. */
 export function wake(scene: Scene): void {
-  scene.drowsiness = 0
-  scene.rooster.dozeUntil = undefined
   for (const w of scene.walkers) {
     if (w.phase === 'idle' && w.dozeUntil !== undefined) w.startledAt = scene.tick
     w.dozeUntil = undefined
-    if (w.isNapping) {
-      w.isNapping = false
-      w.restUntil = scene.tick
-    }
   }
 }
 
-/** Whether a villager is dozing where it rests or napping at home, by day. */
+/** Whether a villager is nodding off by the fire. */
 export function isDozing(walker: Walker, tick: number): boolean {
   return walker.dozeUntil !== undefined && walker.dozeUntil > tick
-}
-
-/** A villager at rest may doze off now and then, the oftener the drowsier the village, but never all at once. */
-function mayDoze(scene: Scene, walker: Walker): boolean {
-  const chance = DOZE_CHANCE.alert + (DOZE_CHANCE.drowsy - DOZE_CHANCE.alert) * scene.drowsiness
-  if (scene.rand() >= chance) return false
-  const dozing = scene.walkers.filter(w => isDozing(w, scene.tick)).length
-  if (dozing + 1 > Math.max(1, Math.floor(scene.walkers.length * MAX_DOZING))) return false
-  walker.dozeUntil = scene.tick + 240 + Math.floor(scene.rand() * 480)
-  if (walker.home !== undefined) {
-    // A nap at home, in bed until it is over.
-    walker.isNapping = true
-    walker.phase = 'goingIn'
-    walker.targetX = doorX(walker.home)
-  } else {
-    walker.pose = 'sit'
-  }
-  return true
 }
 
 /** A spot for a walk in the night: under a street lamp, or near the fire if there are none. */
@@ -656,9 +612,8 @@ function stepBugs(scene: Scene): void {
 }
 
 /**
- * The rooster scratches about near the camp by day, pecking at the ground,
- * and now and then dozes in the sun. At night it settles by the fire; when
- * night turns to day it crows.
+ * The rooster scratches about near the camp by day, pecking at the ground.
+ * At night it settles by the fire to sleep; when night turns to day it crows.
  */
 function stepRooster(scene: Scene, isNight: boolean): void {
   if (!scene.hasRooster) return
@@ -680,17 +635,12 @@ function stepRooster(scene: Scene, isNight: boolean): void {
     r.pose = Math.floor(tick / 2) % 2 === 0 ? 'walk1' : 'walk2'
     return
   }
-  if (isNight || (r.dozeUntil !== undefined && tick < r.dozeUntil)) {
+  if (isNight) {
     r.pose = 'sit'
     return
   }
-  r.dozeUntil = undefined
   if (tick < r.restUntil) {
     if (tick % 8 === 0) r.pose = scene.rand() < 0.5 ? 'peck' : 'stand'
-    return
-  }
-  if (scene.rand() < DOZE_CHANCE.alert + (DOZE_CHANCE.drowsy - DOZE_CHANCE.alert) * scene.drowsiness) {
-    r.dozeUntil = tick + 160 + Math.floor(scene.rand() * 320)
     return
   }
   const side = scene.rand() < 0.5 ? -1 : 1
@@ -722,7 +672,6 @@ export function stepScene(scene: Scene, isNight: boolean): void {
     // A job never waits on fishing: another villager free goes first, else the line comes in.
     if (walker.action?.kind === 'fish' && scene.walkers.some(w => w !== walker && isFree(w) && w.action?.kind !== 'fish')) continue
     if (walker.phase === 'inside') leaveHome(scene, walker)
-    walker.isNapping = false
     walker.dozeUntil = undefined
     walker.strollUntil = undefined
     walker.caught = undefined
@@ -795,10 +744,8 @@ export function stepScene(scene: Scene, isNight: boolean): void {
         if (walk(walker, tick)) {
           openDoor(scene, walker.home)
           walker.phase = 'inside'
-          // A nap lasts its own while; a night in bed a long while; a visit by day a short one.
-          walker.restUntil = walker.isNapping
-            ? (walker.dozeUntil ?? tick)
-            : tick + (isNight ? 200 + Math.floor(scene.rand() * 400) : 40 + Math.floor(scene.rand() * 60))
+          // A night in bed lasts a long while; a visit by day a short one.
+          walker.restUntil = tick + (isNight ? 200 + Math.floor(scene.rand() * 400) : 40 + Math.floor(scene.rand() * 60))
         }
         break
       case 'inside':
@@ -814,9 +761,7 @@ export function stepScene(scene: Scene, isNight: boolean): void {
           }
           break
         }
-        // Out again in the morning, after a nap, or after a short visit by day.
-        walker.isNapping = false
-        walker.dozeUntil = undefined
+        // Out again in the morning, or after a short visit by day.
         leaveHome(scene, walker)
         break
       case 'scouting':
@@ -868,7 +813,6 @@ export function stepScene(scene: Scene, isNight: boolean): void {
           break
         }
         walker.strollUntil = undefined
-        if (!isNight && mayDoze(scene, walker)) break
         // After dark those with a home turn in; by day one sometimes looks in for a while.
         if (walker.home !== undefined && (isNight || scene.rand() < 0.2)) {
           walker.phase = 'goingIn'
