@@ -47,7 +47,7 @@ WorkVillage doesn't update by itself unless you turn that on, so check for updat
 
 1. Open **Customize**, go to **Plugins**, select **Add**, then **Manage marketplaces**.
 2. Select **Check for updates**.
-3. Go back to **Plugins**, open **Your items** and update **WorkVillage**.
+3. Go back to **Plugins**, open **Yours** and update **WorkVillage**.
 4. Start a new session to load the new version.
 
 **In the terminal**
