@@ -32,35 +32,32 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 
 ### 桌面版
 
-桌面版的本機工作階段與終端機共用相同的外掛設定，因此以使用者帳號範圍安裝後，兩邊都能使用。
+1. 開啟「**自訂**」，進入「**外掛程式**」。
+2. 點選「**新增**」→「**新增市集**」，輸入 `JimmyCodeWork/WorkVillage`。
+3. 回到「**外掛程式**」，找到 **WorkVillage** 並安裝。
 
-1. 先新增一次 WorkVillage 的 marketplace。若步驟 2 的外掛瀏覽器中找不到 WorkVillage，
-   請在終端機執行：
-
-   ```
-   claude plugin marketplace add JimmyCodeWork/WorkVillage
-   ```
-
-2. 在 **Code** 分頁的本機工作階段中，點選輸入框旁的 **+**，選擇 **Add plugins**。
-   若選單顯示的是 **Plugins**，請選擇它，再點選 **Browse plugins**。
-3. 選擇 **workvillage**，並選擇安裝範圍：使用者帳號、此專案或僅限本機。
-
-以上方的終端機指令、用使用者帳號範圍安裝，同樣適用於桌面版。雲端工作階段無法使用外掛。
+桌面版與終端機共用外掛，在任一邊安裝一次即可。雲端工作階段無法使用外掛。
 
 ### 更新
 
-WorkVillage 來自第三方 marketplace，除非自行開啟，否則 Claude Code 不會自動更新。
-若要立即更新，可擇一進行：
+除非自行開啟自動更新，否則 WorkVillage 不會自動更新，請不定期檢查是否有新版本。
 
-- 在終端機工作階段執行 `/plugin`，於 **Installed** 分頁開啟 WorkVillage，選擇 **Update now**。
-- 在 shell 中執行：
+**桌面版**
+
+1. 開啟「**自訂**」→「**外掛程式**」→「**新增**」→「**管理市集**」。
+2. 點選「**檢查更新**」。
+3. 回到「**外掛程式**」，在「**您的項目**」中更新 **WorkVillage**。
+4. 開啟新的工作階段，即可載入新版本。
+
+**終端機**
+
+- 執行 `/plugin`，於 **Installed** 分頁開啟 WorkVillage，選擇 **Update now**；或在 shell 中執行：
 
   ```
   claude plugin update workvillage@workvillage
   ```
 
-已開啟的工作階段會沿用原本載入的版本。請在該工作階段執行 `/reload-plugins`，或開啟新的工作階段；
-使用桌面版時，請開啟新的工作階段。
+- 接著執行 `/reload-plugins`，或開啟新的工作階段。
 
 若要讓 WorkVillage 自動更新，請在終端機工作階段執行 `/plugin`，進入 **Marketplaces** 分頁，
 選擇 **workvillage** 後點選 **Enable auto-update**。之後每次啟動工作階段時就會自動更新。

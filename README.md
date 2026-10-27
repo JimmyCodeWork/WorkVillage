@@ -32,38 +32,34 @@ claude plugin install workvillage --marketplace JimmyCodeWork/WorkVillage
 
 ### In the desktop app
 
-The desktop app's local sessions read the same plugin settings as the terminal, so a plugin you
-install for your user account in one is available in the other.
+1. Open **Customize** and go to **Plugins**.
+2. Select **Add**, then **Add marketplace**, and enter `JimmyCodeWork/WorkVillage`.
+3. Go back to **Plugins**, find **WorkVillage** and install it.
 
-1. Add the WorkVillage marketplace once. If the plugin browser in step 2 doesn't list WorkVillage,
-   run this in a terminal:
-
-   ```
-   claude plugin marketplace add JimmyCodeWork/WorkVillage
-   ```
-
-2. In a local session on the **Code** tab, click **+** next to the prompt box and select
-   **Add plugins**. If the menu shows **Plugins** instead, select it, then **Browse plugins**.
-3. Select **workvillage** and choose a scope: your user account, this project, or local only.
-
-Installing from a terminal with the commands above, for your user account, works for the desktop
-app too. Plugins are not available in cloud sessions.
+The desktop app and the terminal share their plugins, so installing in either one is enough.
+Plugins are not available in cloud sessions.
 
 ### Updating
 
-WorkVillage comes from a third-party marketplace, so Claude Code doesn't update it on its own
-unless you turn that on. To update now, do one of these:
+WorkVillage doesn't update by itself unless you turn that on, so check for updates now and then.
 
-- In a terminal session, run `/plugin`, open WorkVillage on the **Installed** tab and select
-  **Update now**.
-- From a shell, run:
+**In the desktop app**
+
+1. Open **Customize**, go to **Plugins**, select **Add**, then **Manage marketplaces**.
+2. Select **Check for updates**.
+3. Go back to **Plugins**, open **Your items** and update **WorkVillage**.
+4. Start a new session to load the new version.
+
+**In the terminal**
+
+- Run `/plugin`, open WorkVillage on the **Installed** tab and select **Update now**, or run this
+  from a shell:
 
   ```
   claude plugin update workvillage@workvillage
   ```
 
-A session that is already open keeps the version it loaded. Run `/reload-plugins` there, or start a
-new session; in the desktop app, start a new session.
+- Then run `/reload-plugins`, or start a new session.
 
 To have WorkVillage update by itself, run `/plugin` in a terminal session, go to the
 **Marketplaces** tab, select **workvillage** and choose **Enable auto-update**. Updates then arrive
